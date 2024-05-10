@@ -25,3 +25,4 @@ dist-ssr
 
 # Project specific
 coverage
+src/sid.reference-implementation.js
