@@ -63,7 +63,12 @@ async function play(songName: string) {
   player.play();
 }
 
-type Song = { size: string; path: string; name: string; format: string };
+interface Song {
+  size: string;
+  path: string;
+  name: string;
+  format: string;
+}
 async function loadSongList(): Promise<Song[]> {
   const regex = /^(?<size>\d+)\s(?<path>.*)\/(?<name>.+)\.(?<format>.+)/;
   const response = await fetch('songlist-demo.txt');

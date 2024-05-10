@@ -1,4 +1,4 @@
-import { jsSID } from './sid.ts';
+import { SIDPlayer } from './sid.ts';
 
 /// <reference types="@types/audioworklet" />
 
@@ -33,7 +33,7 @@ class SIDProcessor
   extends AudioWorkletProcessor
   implements AudioWorkletProcessorImpl, MessageHandler
 {
-  sid = new jsSID(sampleRate, 0);
+  sid = SIDPlayer(/*sampleRate*/);
 
   constructor() {
     super();
@@ -59,7 +59,7 @@ class SIDProcessor
     return true;
   }
 
-  setPosition({ value }: InputMessagesMap['setPosition']) {}
+  setPosition(_data: InputMessagesMap['setPosition']) {}
 
   load({ songData }: InputMessagesMap['load']) {
     this.sid.load(songData, 0);
