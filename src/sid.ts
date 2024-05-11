@@ -24,11 +24,9 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
   let subtune_amount = 1;
   let playlength = 0;
 
-  const preferred_SID_model = [8580, 8580, 8580];
   const SID_model = [8580, 8580, 8580];
   const SID_address = [0xd400, 0, 0];
   const memory = new Uint8Array(65536);
-  //for(var i=0;i<memory.length;i++) memory[i]=0;
   let loaded = 0;
   let initialized = 0;
   let finished = 0;
@@ -77,9 +75,9 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
     initaddr = filedata[0xa] + filedata[0xb] ? filedata[0xa] * 256 + filedata[0xb] : loadaddr;
     playaddr = playaddf = filedata[0xc] * 256 + filedata[0xd];
     subtune_amount = filedata[0xf];
-    preferred_SID_model[0] = (filedata[0x77] & 0x30) >= 0x20 ? 8580 : 6581;
-    preferred_SID_model[1] = (filedata[0x77] & 0xc0) >= 0x80 ? 8580 : 6581;
-    preferred_SID_model[2] = (filedata[0x76] & 3) >= 3 ? 8580 : 6581;
+    SID_model[0] = (filedata[0x77] & 0x30) >= 0x20 ? 8580 : 6581;
+    SID_model[1] = (filedata[0x77] & 0xc0) >= 0x80 ? 8580 : 6581;
+    SID_model[2] = (filedata[0x76] & 3) >= 3 ? 8580 : 6581;
     SID_address[1] =
       filedata[0x7a] >= 0x42 && (filedata[0x7a] < 0x80 || filedata[0x7a] >= 0xe0) ?
         0xd000 + filedata[0x7a] * 16
