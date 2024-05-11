@@ -1,5 +1,25 @@
+/* eslint-disable ts/no-duplicate-enum-values */
 const SID_CHANNEL_AMOUNT = 3;
 const OUTPUT_SCALEDOWN = 0x10000 * SID_CHANNEL_AMOUNT * 16;
+
+// eslint-disable-next-line no-restricted-syntax
+const enum Bitmask {
+  GATE = 0x01,
+  SYNC = 0x02,
+  RING = 0x04,
+  TEST = 0x08,
+  TRI = 0x10,
+  SAW = 0x20,
+  PULSE = 0x40,
+  NOISE = 0x80,
+  HOLDZERO = 0x10,
+  DECAYSUSTAIN = 0x40,
+  ATTACK = 0x80,
+  LOWPASS = 0x10,
+  BANDPASS = 0x20,
+  HIGHPASS = 0x40,
+  OFF3 = 0x80,
+}
 
 // ADSR constants
 // prettier-ignore
@@ -55,22 +75,7 @@ export function createSID(
   ADSRstep[0] = Math.ceil(ADSRperiods[0] / 9);
 
   //SID emulation constants
-  const GATE_BITMASK = 0x01;
-  const SYNC_BITMASK = 0x02;
-  const RING_BITMASK = 0x04;
-  const TEST_BITMASK = 0x08;
-  const TRI_BITMASK = 0x10;
-  const SAW_BITMASK = 0x20;
-  const PULSE_BITMASK = 0x40;
-  const NOISE_BITMASK = 0x80;
-  const HOLDZERO_BITMASK = 0x10;
-  const DECAYSUSTAIN_BITMASK = 0x40;
-  const ATTACK_BITMASK = 0x80;
   const FILTSW = [1, 2, 4, 1, 2, 4, 1, 2, 4] as const;
-  const LOWPASS_BITMASK = 0x10;
-  const BANDPASS_BITMASK = 0x20;
-  const HIGHPASS_BITMASK = 0x40;
-  const OFF3_BITMASK = 0x80;
   //SID emulation variables
   const ADSRstate = [0, 0, 0, 0, 0, 0, 0, 0, 0];
   const ratecnt = [0, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -86,17 +91,11 @@ export function createSID(
   ];
   const prevwfout = [0, 0, 0, 0, 0, 0, 0, 0, 0];
   const prevwavdata = [0, 0, 0, 0, 0, 0, 0, 0, 0];
-  let combiwf;
   const prevlowpass = [0, 0, 0];
   const prevbandpass = [0, 0, 0];
   const cutoff_ratio_8580 = (-2 * 3.14 * (12500 / 256)) / samplerate;
   const cutoff_ratio_6581 = (-2 * 3.14 * (20000 / 256)) / samplerate;
-  let period;
-  let step;
-  let accuadd;
-  let MSB;
   let tmp;
-  let pw;
   let lim;
   let wfout: number;
   let cutoff;
@@ -110,7 +109,7 @@ export function createSID(
     for (let i = 0xd400; i <= 0xd7ff; i++) memory[i] = 0;
     for (let i = 0xde00; i <= 0xdfff; i++) memory[i] = 0;
     for (let i = 0; i < 9; i++) {
-      ADSRstate[i] = HOLDZERO_BITMASK;
+      ADSRstate[i] = Bitmask.HOLDZERO;
       ratecnt[i] = envcnt[i] = expcnt[i] = prevSR[i] = 0;
     }
   }
@@ -126,22 +125,22 @@ export function createSID(
       channel < (num + 1) * SID_CHANNEL_AMOUNT;
       channel++
     ) {
-      const prevgate = ADSRstate[channel] & GATE_BITMASK;
+      const prevgate = ADSRstate[channel] & Bitmask.GATE;
       const chnadd = SIDaddr + (channel - num * SID_CHANNEL_AMOUNT) * 7;
       const ctrl = memory[chnadd + 4];
       const wf = ctrl & 0xf0;
-      const test = ctrl & TEST_BITMASK;
+      const test = ctrl & Bitmask.TEST;
       const SR = memory[chnadd + 6];
       tmp = 0;
 
       //ADSR envelope generator:
-      if (prevgate !== (ctrl & GATE_BITMASK)) {
+      if (prevgate !== (ctrl & Bitmask.GATE)) {
         //gatebit-change?
         if (prevgate) {
-          ADSRstate[channel] &= 0xff - (GATE_BITMASK | ATTACK_BITMASK | DECAYSUSTAIN_BITMASK);
+          ADSRstate[channel] &= 0xff - (Bitmask.GATE | Bitmask.ATTACK | Bitmask.DECAYSUSTAIN);
         } //falling edge (with Whittaker workaround this never happens, but should be here)
         else {
-          ADSRstate[channel] = GATE_BITMASK | ATTACK_BITMASK | DECAYSUSTAIN_BITMASK;
+          ADSRstate[channel] = Bitmask.GATE | Bitmask.ATTACK | Bitmask.DECAYSUSTAIN;
           //rising edge, also sets hold_zero_bit=0
           if ((SR & 0xf) > (prevSR[channel] & 0xf)) tmp = 1;
           //assume SR->GATE write order: workaround to have crisp soundstarts by triggering delay-bug
@@ -155,41 +154,36 @@ export function createSID(
       //can wrap around (ADSR delay-bug: short 1st frame is usually achieved by utilizing this bug)
 
       //set ADSR period that should be checked against rate-counter (depending on ADSR state Attack/DecaySustain/Release)
-      if (ADSRstate[channel] & ATTACK_BITMASK) {
-        step = memory[chnadd + 5] >> 4;
-        period = ADSRperiods[step];
-      } else if (ADSRstate[channel] & DECAYSUSTAIN_BITMASK) {
-        step = memory[chnadd + 5] & 0xf;
-        period = ADSRperiods[step];
-      } else {
-        step = SR & 0xf;
-        period = ADSRperiods[step];
-      }
-      step = ADSRstep[step];
+      const periodStep =
+        ADSRstate[channel] & Bitmask.ATTACK ? memory[chnadd + 5] >> 4
+        : ADSRstate[channel] & Bitmask.DECAYSUSTAIN ? memory[chnadd + 5] & 0xf
+        : SR & 0xf;
+      const period = ADSRperiods[periodStep];
+      const step = ADSRstep[periodStep];
 
       if (ratecnt[channel] >= period && ratecnt[channel] < period + clk_ratio && tmp === 0) {
         //ratecounter shot (matches rateperiod) (in genuine SID ratecounter is LFSR)
         ratecnt[channel] -= period;
         //compensation for timing instead of simply setting 0 on rate-counter overload
         if (
-          ADSRstate[channel] & ATTACK_BITMASK ||
+          ADSRstate[channel] & Bitmask.ATTACK ||
           ++expcnt[channel] === ADSR_exptable[envcnt[channel]]
         ) {
-          if (!(ADSRstate[channel] & HOLDZERO_BITMASK)) {
-            if (ADSRstate[channel] & ATTACK_BITMASK) {
+          if (!(ADSRstate[channel] & Bitmask.HOLDZERO)) {
+            if (ADSRstate[channel] & Bitmask.ATTACK) {
               envcnt[channel] += step;
               if (envcnt[channel] >= 0xff) {
                 envcnt[channel] = 0xff;
-                ADSRstate[channel] &= 0xff - ATTACK_BITMASK;
+                ADSRstate[channel] &= 0xff - Bitmask.ATTACK;
               }
             } else if (
-              !(ADSRstate[channel] & DECAYSUSTAIN_BITMASK) ||
+              !(ADSRstate[channel] & Bitmask.DECAYSUSTAIN) ||
               envcnt[channel] > (SR >> 4) + (SR & 0xf0)
             ) {
               envcnt[channel] -= step;
               if (envcnt[channel] <= 0 && envcnt[channel] + step !== 0) {
                 envcnt[channel] = 0;
-                ADSRstate[channel] |= HOLDZERO_BITMASK;
+                ADSRstate[channel] |= Bitmask.HOLDZERO;
               }
             }
           }
@@ -201,19 +195,19 @@ export function createSID(
       //'envcnt' may wrap around in some cases, mostly 0 -> FF (e.g.: Cloudless Rain, Boombox Alley)
 
       //WAVE generation codes (phase accumulator and waveform-selector):  (They are explained in resid source, I won't go in details, the code speaks for itself.)
-      accuadd = (memory[chnadd] + memory[chnadd + 1] * 256) * clk_ratio;
-      if (test || (ctrl & SYNC_BITMASK && sourceMSBrise[num])) {
+      const accuadd = (memory[chnadd] + memory[chnadd + 1] * 256) * clk_ratio;
+      if (test || (ctrl & Bitmask.SYNC && sourceMSBrise[num])) {
         phaseaccu[channel] = 0;
       } else {
         phaseaccu[channel] += accuadd;
         if (phaseaccu[channel] > 0xffffff) phaseaccu[channel] -= 0x1000000;
       }
-      MSB = phaseaccu[channel] & 0x800000;
+      const MSB = phaseaccu[channel] & 0x800000;
       sourceMSBrise[num] = MSB > (prevaccu[channel] & 0x800000) ? 1 : 0;
       //phaseaccu[channel] &= 0xFFFFFF;
 
       //waveform-selector:
-      if (wf & NOISE_BITMASK) {
+      if (wf & Bitmask.NOISE) {
         //noise waveform
         tmp = noise_LFSR[channel];
         if (
@@ -221,8 +215,8 @@ export function createSID(
           accuadd >= 0x100000
         ) {
           //clock LFSR all time if clockrate exceeds observable at given samplerate
-          step = (tmp & 0x400000) ^ ((tmp & 0x20000) << 5);
-          tmp = ((tmp << 1) + (step > 0 || test)) & 0x7fffff;
+          const step = (tmp & 0x400000) ^ ((tmp & 0x20000) << 5);
+          tmp = ((tmp << 1) + +(step > 0 || test)) & 0x7fffff;
           noise_LFSR[channel] = tmp;
         }
         //we simply zero output when other waveform is mixed with noise. On real SID LFSR continuously gets filled by zero and locks up. ($C1 waveform with pw<8 can keep it for a while...)
@@ -237,16 +231,16 @@ export function createSID(
             ((tmp & 0x04) << 7) +
             ((tmp & 0x01) << 8)
           );
-      } else if (wf & PULSE_BITMASK) {
+      } else if (wf & Bitmask.PULSE) {
         //simple pulse
-        pw = (memory[chnadd + 2] + (memory[chnadd + 3] & 0xf) * 256) * 16;
+        let pw = (memory[chnadd + 2] + (memory[chnadd + 3] & 0xf) * 256) * 16;
         tmp = accuadd >> 9;
         if (pw > 0 && pw < tmp) pw = tmp;
         tmp ^= 0xffff;
         if (pw > tmp) pw = tmp;
         tmp = phaseaccu[channel] >> 8;
-        if (wf === PULSE_BITMASK) {
-          step = 256 / (accuadd >> 16);
+        if (wf === Bitmask.PULSE) {
+          const step = 256 / (accuadd >> 16);
           //simple pulse, most often used waveform, make it sound as clean as possible without oversampling
           //One of my biggest success with the SwinSID-variant was that I could clean the high-pitched and thin sounds.
           //(You might have faced with the unpleasant sound quality of high-pitched sounds without oversampling. We need so-called 'band-limited' synthesis instead.
@@ -276,12 +270,12 @@ export function createSID(
           //combined pulse
           wfout = tmp >= pw || test ? 0xffff : 0;
           //(this would be enough for simple but aliased-at-high-pitches pulse)
-          if (wf & TRI_BITMASK) {
-            if (wf & SAW_BITMASK) {
+          if (wf & Bitmask.TRI) {
+            if (wf & Bitmask.SAW) {
               wfout = wfout ? combinedWaveForm(num, channel, PulseTriSaw_8580, tmp >> 4, 1) : 0;
             } //pulse+saw+triangle (waveform nearly identical to tri+saw)
             else {
-              tmp = phaseaccu[channel] ^ (ctrl & RING_BITMASK ? sourceMSB[num] : 0);
+              tmp = phaseaccu[channel] ^ (ctrl & Bitmask.RING ? sourceMSB[num] : 0);
               wfout =
                 wfout ?
                   combinedWaveForm(
@@ -294,11 +288,11 @@ export function createSID(
                 : 0;
             }
           } //pulse+triangle
-          else if (wf & SAW_BITMASK)
+          else if (wf & Bitmask.SAW)
             wfout = wfout ? combinedWaveForm(num, channel, PulseSaw_8580, tmp >> 4, 1) : 0;
           //pulse+saw
         }
-      } else if (wf & SAW_BITMASK) {
+      } else if (wf & Bitmask.SAW) {
         //saw
         wfout = phaseaccu[channel] >> 8;
         //saw (this row would be enough for simple but aliased-at-high-pitch saw)
@@ -308,17 +302,17 @@ export function createSID(
         //The waveform at the output essentially becomes an asymmetric triangle, more-and-more approaching symmetric shape towards high frequencies.
         //(If you check a recording from the real SID, you can see a similar shape, the high-pitch sawtooth waves are triangle-like...)
         //But for deep sounds the sawtooth is really close to a sawtooth, as there is no aliasing there, but deep sounds should be sharp...
-        if (wf & TRI_BITMASK) wfout = combinedWaveForm(num, channel, TriSaw_8580, wfout >> 4, 1);
+        if (wf & Bitmask.TRI) wfout = combinedWaveForm(num, channel, TriSaw_8580, wfout >> 4, 1);
         //saw+triangle
         else {
-          step = accuadd / 0x1200000;
+          const step = accuadd / 0x1200000;
           wfout += wfout * step;
           if (wfout > 0xffff) wfout = 0xffff - (wfout - 0x10000) / step;
         }
         //simple cleaned (bandlimited) saw
-      } else if (wf & TRI_BITMASK) {
+      } else if (wf & Bitmask.TRI) {
         //triangle (this waveform has no harsh edges, so it doesn't suffer from strong aliasing at high pitches)
-        tmp = phaseaccu[channel] ^ (ctrl & RING_BITMASK ? sourceMSB[num] : 0);
+        tmp = phaseaccu[channel] ^ (ctrl & Bitmask.RING ? sourceMSB[num] : 0);
         wfout = (tmp ^ (tmp & 0x800000 ? 0xffffff : 0)) >> 7;
       }
 
@@ -334,7 +328,7 @@ export function createSID(
       //routing the channel signal to either the filter or the unfiltered master output depending on filter-switch SID-registers
       if (memory[SIDaddr + 0x17] & FILTSW[channel])
         filtin += (wfout - 0x8000) * (envcnt[channel] / 256);
-      else if (channel % SID_CHANNEL_AMOUNT !== 2 || !(memory[SIDaddr + 0x18] & OFF3_BITMASK))
+      else if (channel % SID_CHANNEL_AMOUNT !== 2 || !(memory[SIDaddr + 0x18] & Bitmask.OFF3))
         output += (wfout - 0x8000) * (envcnt[channel] / 256);
     }
 
@@ -356,13 +350,13 @@ export function createSID(
       resonance = memory[SIDaddr + 0x17] > 0x5f ? 8 / (memory[SIDaddr + 0x17] >> 4) : 1.41;
     }
     tmp = filtin + prevbandpass[num] * resonance + prevlowpass[num];
-    if (memory[SIDaddr + 0x18] & HIGHPASS_BITMASK) output -= tmp;
+    if (memory[SIDaddr + 0x18] & Bitmask.HIGHPASS) output -= tmp;
     tmp = prevbandpass[num] - tmp * cutoff;
     prevbandpass[num] = tmp;
-    if (memory[SIDaddr + 0x18] & BANDPASS_BITMASK) output -= tmp;
+    if (memory[SIDaddr + 0x18] & Bitmask.BANDPASS) output -= tmp;
     tmp = prevlowpass[num] + tmp * cutoff;
     prevlowpass[num] = tmp;
-    if (memory[SIDaddr + 0x18] & LOWPASS_BITMASK) output += tmp;
+    if (memory[SIDaddr + 0x18] & Bitmask.LOWPASS) output += tmp;
 
     //when it comes to $D418 volume-register digi playback, I made an AC / DC separation for $D418 value in the SwinSID at low (20Hz or so) cutoff-frequency,
     //and sent the AC (highpass) value to a 4th 'digi' channel mixed to the master output, and set ONLY the DC (lowpass) value to the volume-control.
@@ -421,7 +415,7 @@ export function createSID(
   ) {
     //on 6581 most combined waveforms are essentially halved 8580-like waves
     if (differ6581 && SID_model[num] === 6581) index &= 0x7ff;
-    combiwf = (waveform[index] + prevwavdata[channel]) / 2;
+    const combiwf = (waveform[index] + prevwavdata[channel]) / 2;
     prevwavdata[channel] = waveform[index];
     return combiwf;
   }
