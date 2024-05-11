@@ -98,48 +98,48 @@ export function createCPU(memory: Uint8Array) {
           T = A;
           A += memory[addr] + (ST & 1);
           ST &= 20;
-          ST |= (A & 128) | (A > 255);
+          ST |= (A & 128) | +(A > 255);
           A &= 0xff;
-          ST |= (!A << 1) | ((!((T ^ memory[addr]) & 0x80) && (T ^ A) & 0x80) >> 1);
+          ST |= (+!A << 1) | (+(!((T ^ memory[addr]) & 0x80) && (T ^ A) & 0x80) >> 1);
           break;
         //ADC
         case 0xe0:
           T = A;
-          A -= memory[addr] + !(ST & 1);
+          A -= memory[addr] + +!(ST & 1);
           ST &= 20;
-          ST |= (A & 128) | (A >= 0);
+          ST |= (A & 128) | +(A >= 0);
           A &= 0xff;
-          ST |= (!A << 1) | (((T ^ memory[addr]) & 0x80 && (T ^ A) & 0x80) >> 1);
+          ST |= (+!A << 1) | (((T ^ memory[addr]) & 0x80 && (T ^ A) & 0x80) >> 1);
           break;
         //SBC
         case 0xc0:
           T = A - memory[addr];
           ST &= 124;
-          ST |= (!(T & 0xff) << 1) | (T & 128) | (T >= 0);
+          ST |= (+!(T & 0xff) << 1) | (T & 128) | +(T >= 0);
           break;
         //CMP
         case 0x00:
           A |= memory[addr];
           ST &= 125;
-          ST |= (!A << 1) | (A & 128);
+          ST |= (+!A << 1) | (A & 128);
           break;
         //ORA
         case 0x20:
           A &= memory[addr];
           ST &= 125;
-          ST |= (!A << 1) | (A & 128);
+          ST |= (+!A << 1) | (A & 128);
           break;
         //AND
         case 0x40:
           A ^= memory[addr];
           ST &= 125;
-          ST |= (!A << 1) | (A & 128);
+          ST |= (+!A << 1) | (A & 128);
           break;
         //EOR
         case 0xa0:
           A = memory[addr];
           ST &= 125;
-          ST |= (!A << 1) | (A & 128);
+          ST |= (+!A << 1) | (A & 128);
           if ((IR & 3) === 3) X = A;
           break;
         //LDA / LAX (illegal, used by my 1 rasterline player)
@@ -182,16 +182,16 @@ export function createCPU(memory: Uint8Array) {
             //ASL/ROL (Accu)
             A = (A << 1) + (ST & 1);
             ST &= 60;
-            ST |= (A & 128) | (A > 255);
+            ST |= (A & 128) | +(A > 255);
             A &= 0xff;
-            ST |= !A << 1;
+            ST |= +!A << 1;
           } else {
             //RMW (Read-Write-Modify)
             T = (memory[addr] << 1) + (ST & 1);
             ST &= 60;
-            ST |= (T & 128) | (T > 255);
+            ST |= (T & 128) | +(T > 255);
             T &= 0xff;
-            ST |= !T << 1;
+            ST |= +!T << 1;
             memory[addr] = T;
             cycles += 2;
           }
@@ -207,13 +207,13 @@ export function createCPU(memory: Uint8Array) {
             ST &= 60;
             ST |= (A & 128) | (T & 1);
             A &= 0xff;
-            ST |= !A << 1;
+            ST |= +!A << 1;
           } else {
             T = (memory[addr] >> 1) + (ST & 1) * 128;
             ST &= 60;
             ST |= (T & 128) | (memory[addr] & 1);
             T &= 0xff;
-            ST |= !T << 1;
+            ST |= +!T << 1;
             memory[addr] = T;
             cycles += 2;
           }
@@ -224,14 +224,14 @@ export function createCPU(memory: Uint8Array) {
             memory[addr]--;
             memory[addr] &= 0xff;
             ST &= 125;
-            ST |= (!memory[addr] << 1) | (memory[addr] & 128);
+            ST |= (+!memory[addr] << 1) | (memory[addr] & 128);
             cycles += 2;
           } //DEC
           else {
             X--;
             X &= 0xff;
             ST &= 125;
-            ST |= (!X << 1) | (X & 128);
+            ST |= (+!X << 1) | (X & 128);
           }
           break;
         //DEX
@@ -242,7 +242,7 @@ export function createCPU(memory: Uint8Array) {
             break;
           } else X = A;
           ST &= 125;
-          ST |= (!X << 1) | (X & 128);
+          ST |= (+!X << 1) | (X & 128);
           break;
         //LDX/TSX/TAX
         case 0x80:
@@ -253,7 +253,7 @@ export function createCPU(memory: Uint8Array) {
           else {
             A = X;
             ST &= 125;
-            ST |= (!A << 1) | (A & 128);
+            ST |= (+!A << 1) | (A & 128);
           }
           break;
         //STX/TXS/TXA
@@ -262,7 +262,7 @@ export function createCPU(memory: Uint8Array) {
             memory[addr]++;
             memory[addr] &= 0xff;
             ST &= 125;
-            ST |= (!memory[addr] << 1) | (memory[addr] & 128);
+            ST |= (+!memory[addr] << 1) | (memory[addr] & 128);
             cycles += 2;
           }
         //INC/NOP
@@ -275,7 +275,7 @@ export function createCPU(memory: Uint8Array) {
           SP &= 0xff;
           A = memory[0x100 + SP];
           ST &= 125;
-          ST |= (!A << 1) | (A & 128);
+          ST |= (+!A << 1) | (A & 128);
           cycles = 4;
           break;
         //PLA
@@ -283,21 +283,21 @@ export function createCPU(memory: Uint8Array) {
           Y++;
           Y &= 0xff;
           ST &= 125;
-          ST |= (!Y << 1) | (Y & 128);
+          ST |= (+!Y << 1) | (Y & 128);
           break;
         //INY
         case 0xe0:
           X++;
           X &= 0xff;
           ST &= 125;
-          ST |= (!X << 1) | (X & 128);
+          ST |= (+!X << 1) | (X & 128);
           break;
         //INX
         case 0x80:
           Y--;
           Y &= 0xff;
           ST &= 125;
-          ST |= (!Y << 1) | (Y & 128);
+          ST |= (+!Y << 1) | (Y & 128);
           break;
         //DEY
         case 0x00:
@@ -324,13 +324,13 @@ export function createCPU(memory: Uint8Array) {
         case 0x90:
           A = Y;
           ST &= 125;
-          ST |= (!A << 1) | (A & 128);
+          ST |= (+!A << 1) | (A & 128);
           break;
         //TYA
         case 0xa0:
           Y = A;
           ST &= 125;
-          ST |= (!Y << 1) | (Y & 128);
+          ST |= (+!Y << 1) | (Y & 128);
           break;
         //TAY
         default:
@@ -399,7 +399,7 @@ export function createCPU(memory: Uint8Array) {
             if (IR & 0xf) {
               //BIT
               ST &= 0x3d;
-              ST |= (memory[addr] & 0xc0) | (!(A & memory[addr]) << 1);
+              ST |= (memory[addr] & 0xc0) | (+!(A & memory[addr]) << 1);
             } else {
               //JSR
               memory[0x100 + SP] = (PC + 2) % 256;
@@ -452,17 +452,17 @@ export function createCPU(memory: Uint8Array) {
           case 0xc0: //CPY
             T = Y - memory[addr];
             ST &= 124;
-            ST |= (!(T & 0xff) << 1) | (T & 128) | (T >= 0);
+            ST |= (+!(T & 0xff) << 1) | (T & 128) | +(T >= 0);
             break;
           case 0xe0: //CPX
             T = X - memory[addr];
             ST &= 124;
-            ST |= (!(T & 0xff) << 1) | (T & 128) | (T >= 0);
+            ST |= (+!(T & 0xff) << 1) | (T & 128) | +(T >= 0);
             break;
           case 0xa0: //LDY
             Y = memory[addr];
             ST &= 125;
-            ST |= (!Y << 1) | (Y & 128);
+            ST |= (+!Y << 1) | (Y & 128);
             break;
           case 0x80: //STY
             memory[addr] = Y;
