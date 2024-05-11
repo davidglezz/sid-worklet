@@ -7,6 +7,7 @@ export default antfu(
   },
   {
     rules: {
+      'no-fallthrough': 'off',
       // Prettier incompatibility
       'unicorn/number-literal-case': 'off',
       'node/prefer-global/buffer': 'off',
