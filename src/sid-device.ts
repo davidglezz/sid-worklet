@@ -1,8 +1,6 @@
-/* eslint-disable ts/no-duplicate-enum-values */
 const SID_CHANNEL_AMOUNT = 3;
 const OUTPUT_SCALEDOWN = 0x10000 * SID_CHANNEL_AMOUNT * 16;
 
-// eslint-disable-next-line no-restricted-syntax
 const enum Bitmask {
   GATE = 0x01,
   SYNC = 0x02,
@@ -22,14 +20,12 @@ const enum Bitmask {
 }
 
 // ADSR constants
-// prettier-ignore
 const ADSRperiods = [
-  0, 32, 63, 95, 149, 220, 267, 313, 392, 977, 1954, 3126, 3907, 11720, 19532, 31251
+  0, 32, 63, 95, 149, 220, 267, 313, 392, 977, 1954, 3126, 3907, 11720, 19532, 31251,
 ];
 const ADSRstep = [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
 
-//prescaler values that slow down the envelope-counter as it decays and approaches zero level
-//pos0:1, pos6:30, pos14:16, pos26:8, pos54:4, pos93:2
+// Prescaler values that slow down the envelope-counter as it decays and approaches zero level
 const ADSR_exptable = [
   1, 30, 30, 30, 30, 30, 30, 16, 16, 16, 16, 16, 16, 16, 16, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 4,
   4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 2, 2, 2, 2, 2, 2,
@@ -44,7 +40,7 @@ const ADSR_exptable = [
 // Waveforms
 function createCombineWaveForm(bitmul: number, bitstrength: number, treshold: number) {
   const waveform = Array.from<number>({ length: 4096 });
-  //I found out how the combined waveform works (neighboring bits affect each other recursively)
+  // Neighboring bits affect each other recursively
   for (let i = 0; i < 4096; i++) {
     let value = 0;
     //neighbour-bit strength and DAC MOSFET treshold is approximately set by ears'n'trials
@@ -95,15 +91,11 @@ export function createSID(
   const prevbandpass = [0, 0, 0];
   const cutoff_ratio_8580 = (-2 * 3.14 * (12500 / 256)) / samplerate;
   const cutoff_ratio_6581 = (-2 * 3.14 * (20000 / 256)) / samplerate;
-  let tmp;
-  let lim;
   let wfout: number;
-  let cutoff;
-  let resonance;
-  let filtin;
+  let cutoff: number;
+  let resonance: number;
+  let filtin: number;
   let output: number;
-  //registers: 0:freql1  1:freqh1  2:pwml1  3:pwmh1  4:ctrl1  5:ad1   6:sr1  7:freql2  8:freqh2  9:pwml2 10:pwmh2 11:ctrl2 12:ad2  13:sr 14:freql3 15:freqh3 16:pwml3 17:pwmh3 18:ctrl3 19:ad3  20:sr3
-  //           21:cutoffl 22:cutoffh 23:flsw_reso 24:vol_ftype 25:potX 26:potY 27:OSC3 28:ENV3
 
   function init() {
     for (let i = 0xd400; i <= 0xd7ff; i++) memory[i] = 0;
@@ -131,9 +123,9 @@ export function createSID(
       const wf = ctrl & 0xf0;
       const test = ctrl & Bitmask.TEST;
       const SR = memory[chnadd + 6];
-      tmp = 0;
 
       //ADSR envelope generator:
+      let crispStart = 0;
       if (prevgate !== (ctrl & Bitmask.GATE)) {
         //gatebit-change?
         if (prevgate) {
@@ -142,7 +134,7 @@ export function createSID(
         else {
           ADSRstate[channel] = Bitmask.GATE | Bitmask.ATTACK | Bitmask.DECAYSUSTAIN;
           //rising edge, also sets hold_zero_bit=0
-          if ((SR & 0xf) > (prevSR[channel] & 0xf)) tmp = 1;
+          if ((SR & 0xf) > (prevSR[channel] & 0xf)) crispStart = 1;
           //assume SR->GATE write order: workaround to have crisp soundstarts by triggering delay-bug
         }
         //(this is for the possible missed CTRL(GATE) vs SR register write order situations (1MHz CPU is cca 20 times faster than samplerate)
@@ -161,7 +153,7 @@ export function createSID(
       const period = ADSRperiods[periodStep];
       const step = ADSRstep[periodStep];
 
-      if (ratecnt[channel] >= period && ratecnt[channel] < period + clk_ratio && tmp === 0) {
+      if (ratecnt[channel] >= period && ratecnt[channel] < period + clk_ratio && crispStart === 0) {
         //ratecounter shot (matches rateperiod) (in genuine SID ratecounter is LFSR)
         ratecnt[channel] -= period;
         //compensation for timing instead of simply setting 0 on rate-counter overload
@@ -209,36 +201,37 @@ export function createSID(
       //waveform-selector:
       if (wf & Bitmask.NOISE) {
         //noise waveform
-        tmp = noise_LFSR[channel];
+        let noiseLFSR = noise_LFSR[channel];
         if (
           (phaseaccu[channel] & 0x100000) !== (prevaccu[channel] & 0x100000) ||
           accuadd >= 0x100000
         ) {
           //clock LFSR all time if clockrate exceeds observable at given samplerate
-          const step = (tmp & 0x400000) ^ ((tmp & 0x20000) << 5);
-          tmp = ((tmp << 1) + +(step > 0 || test)) & 0x7fffff;
-          noise_LFSR[channel] = tmp;
+          const step = (noiseLFSR & 0x400000) ^ ((noiseLFSR & 0x20000) << 5);
+          noiseLFSR = ((noiseLFSR << 1) + +(step > 0 || test)) & 0x7fffff;
+          noise_LFSR[channel] = noiseLFSR;
         }
         //we simply zero output when other waveform is mixed with noise. On real SID LFSR continuously gets filled by zero and locks up. ($C1 waveform with pw<8 can keep it for a while...)
         wfout =
           wf & 0x70 ? 0 : (
-            ((tmp & 0x100000) >> 5) +
-            ((tmp & 0x40000) >> 4) +
-            ((tmp & 0x4000) >> 1) +
-            ((tmp & 0x800) << 1) +
-            ((tmp & 0x200) << 2) +
-            ((tmp & 0x20) << 5) +
-            ((tmp & 0x04) << 7) +
-            ((tmp & 0x01) << 8)
+            ((noiseLFSR & 0x100000) >> 5) +
+            ((noiseLFSR & 0x40000) >> 4) +
+            ((noiseLFSR & 0x4000) >> 1) +
+            ((noiseLFSR & 0x800) << 1) +
+            ((noiseLFSR & 0x200) << 2) +
+            ((noiseLFSR & 0x20) << 5) +
+            ((noiseLFSR & 0x04) << 7) +
+            ((noiseLFSR & 0x01) << 8)
           );
       } else if (wf & Bitmask.PULSE) {
         //simple pulse
         let pw = (memory[chnadd + 2] + (memory[chnadd + 3] & 0xf) * 256) * 16;
-        tmp = accuadd >> 9;
-        if (pw > 0 && pw < tmp) pw = tmp;
-        tmp ^= 0xffff;
-        if (pw > tmp) pw = tmp;
-        tmp = phaseaccu[channel] >> 8;
+        const pwMin = accuadd >> 9;
+        if (pw > 0 && pw < pwMin) pw = pwMin;
+        const pwMax = pwMin ^ 0xffff;
+        if (pw > pwMax) pw = pwMax;
+
+        const phase = phaseaccu[channel] >> 8;
         if (wf === Bitmask.PULSE) {
           const step = 256 / (accuadd >> 16);
           //simple pulse, most often used waveform, make it sound as clean as possible without oversampling
@@ -251,46 +244,48 @@ export function createSID(
           //The only solution that worked for me in the end, what I came up eventually: The harsh rising and falling edges of the pulse are
           //elongated making it a bit trapezoid. But not in time-domain, but altering the transfer-characteristics. This had to be done
           //in a frequency-dependent way, proportionally to pitch, to keep the deep sounds crisp. The following code does this (my favourite testcase is Robocop3 intro):
-          if (test) wfout = 0xffff;
-          else if (tmp < pw) {
-            lim = (0xffff - pw) * step;
-            if (lim > 0xffff) lim = 0xffff;
-            wfout = lim - (pw - tmp) * step;
+          if (test) {
+            wfout = 0xffff;
+          } else if (phase < pw) {
+            //rising edge
+            let limit = (0xffff - pw) * step;
+            if (limit > 0xffff) limit = 0xffff;
+            wfout = limit - (pw - phase) * step;
             if (wfout < 0) wfout = 0;
-          } //rising edge
-          else {
-            lim = pw * step;
-            if (lim > 0xffff) lim = 0xffff;
-            wfout = (0xffff - tmp) * step - lim;
+          } else {
+            //falling edge
+            let limit = pw * step;
+            if (limit > 0xffff) limit = 0xffff;
+            wfout = (0xffff - phase) * step - limit;
             if (wfout >= 0) wfout = 0xffff;
             wfout &= 0xffff;
           }
-          //falling edge
-        } else {
+        } else if (phase >= pw || test) {
           //combined pulse
-          wfout = tmp >= pw || test ? 0xffff : 0;
           //(this would be enough for simple but aliased-at-high-pitches pulse)
+          wfout = 0xffff;
+
+          // pulse+triangle
           if (wf & Bitmask.TRI) {
+            // pulse+triangle+saw (waveform nearly identical to tri+saw)
             if (wf & Bitmask.SAW) {
-              wfout = wfout ? combinedWaveForm(num, channel, PulseTriSaw_8580, tmp >> 4, 1) : 0;
-            } //pulse+saw+triangle (waveform nearly identical to tri+saw)
-            else {
-              tmp = phaseaccu[channel] ^ (ctrl & Bitmask.RING ? sourceMSB[num] : 0);
-              wfout =
-                wfout ?
-                  combinedWaveForm(
-                    num,
-                    channel,
-                    PulseSaw_8580,
-                    (tmp ^ (tmp & 0x800000 ? 0xffffff : 0)) >> 11,
-                    0,
-                  )
-                : 0;
+              wfout = combinedWaveForm(num, channel, PulseTriSaw_8580, phase >> 4, 1);
+            } else {
+              const value = phaseaccu[channel] ^ (ctrl & Bitmask.RING ? sourceMSB[num] : 0);
+              wfout = combinedWaveForm(
+                num,
+                channel,
+                PulseSaw_8580,
+                (value ^ (value & 0x800000 ? 0xffffff : 0)) >> 11,
+                0,
+              );
             }
-          } //pulse+triangle
-          else if (wf & Bitmask.SAW)
-            wfout = wfout ? combinedWaveForm(num, channel, PulseSaw_8580, tmp >> 4, 1) : 0;
-          //pulse+saw
+          } else if (wf & Bitmask.SAW) {
+            //pulse+saw
+            wfout = combinedWaveForm(num, channel, PulseSaw_8580, phase >> 4, 1);
+          }
+        } else {
+          wfout = 0;
         }
       } else if (wf & Bitmask.SAW) {
         //saw
@@ -302,34 +297,36 @@ export function createSID(
         //The waveform at the output essentially becomes an asymmetric triangle, more-and-more approaching symmetric shape towards high frequencies.
         //(If you check a recording from the real SID, you can see a similar shape, the high-pitch sawtooth waves are triangle-like...)
         //But for deep sounds the sawtooth is really close to a sawtooth, as there is no aliasing there, but deep sounds should be sharp...
-        if (wf & Bitmask.TRI) wfout = combinedWaveForm(num, channel, TriSaw_8580, wfout >> 4, 1);
-        //saw+triangle
-        else {
+        if (wf & Bitmask.TRI) {
+          //saw+triangle
+          wfout = combinedWaveForm(num, channel, TriSaw_8580, wfout >> 4, 1);
+        } else {
+          //simple cleaned (bandlimited) saw
           const step = accuadd / 0x1200000;
           wfout += wfout * step;
-          if (wfout > 0xffff) wfout = 0xffff - (wfout - 0x10000) / step;
+          if (wfout > 0xffff) {
+            wfout = 0xffff - (wfout - 0x10000) / step;
+          }
         }
-        //simple cleaned (bandlimited) saw
       } else if (wf & Bitmask.TRI) {
         //triangle (this waveform has no harsh edges, so it doesn't suffer from strong aliasing at high pitches)
-        tmp = phaseaccu[channel] ^ (ctrl & Bitmask.RING ? sourceMSB[num] : 0);
-        wfout = (tmp ^ (tmp & 0x800000 ? 0xffffff : 0)) >> 7;
+        const value = phaseaccu[channel] ^ (ctrl & Bitmask.RING ? sourceMSB[num] : 0);
+        wfout = (value ^ (value & 0x800000 ? 0xffffff : 0)) >> 7;
       }
 
-      if (wf) prevwfout[channel] = wfout;
-      else {
-        wfout = prevwfout[channel];
-      }
+      prevwfout[channel] = wfout = wf ? wfout : prevwfout[channel];
+
       //emulate waveform 00 floating wave-DAC (on real SID waveform00 decays after 15s..50s depending on temperature?)
       prevaccu[channel] = phaseaccu[channel];
       sourceMSB[num] = MSB;
       //(So the decay is not an exact value. Anyway, we just simply keep the value to avoid clicks and support SounDemon digi later...)
 
       //routing the channel signal to either the filter or the unfiltered master output depending on filter-switch SID-registers
-      if (memory[SIDaddr + 0x17] & FILTSW[channel])
+      if (memory[SIDaddr + 0x17] & FILTSW[channel]) {
         filtin += (wfout - 0x8000) * (envcnt[channel] / 256);
-      else if (channel % SID_CHANNEL_AMOUNT !== 2 || !(memory[SIDaddr + 0x18] & Bitmask.OFF3))
+      } else if (channel % SID_CHANNEL_AMOUNT !== 2 || !(memory[SIDaddr + 0x18] & Bitmask.OFF3)) {
         output += (wfout - 0x8000) * (envcnt[channel] / 256);
+      }
     }
 
     //update readable SID-registers (some SID tunes might use 3rd channel ENV3/OSC3 value as control)
@@ -345,18 +342,17 @@ export function createSID(
       cutoff = 1 - Math.exp(cutoff * cutoff_ratio_8580);
       resonance = 2 ** ((4 - (memory[SIDaddr + 0x17] >> 4)) / 8);
     } else {
-      if (cutoff < 24) cutoff = 0.035;
-      else cutoff = 1 - 1.263 * Math.exp(cutoff * cutoff_ratio_6581);
+      cutoff = cutoff < 24 ? 0.035 : 1 - 1.263 * Math.exp(cutoff * cutoff_ratio_6581);
       resonance = memory[SIDaddr + 0x17] > 0x5f ? 8 / (memory[SIDaddr + 0x17] >> 4) : 1.41;
     }
-    tmp = filtin + prevbandpass[num] * resonance + prevlowpass[num];
-    if (memory[SIDaddr + 0x18] & Bitmask.HIGHPASS) output -= tmp;
-    tmp = prevbandpass[num] - tmp * cutoff;
-    prevbandpass[num] = tmp;
-    if (memory[SIDaddr + 0x18] & Bitmask.BANDPASS) output -= tmp;
-    tmp = prevlowpass[num] + tmp * cutoff;
-    prevlowpass[num] = tmp;
-    if (memory[SIDaddr + 0x18] & Bitmask.LOWPASS) output += tmp;
+    let filterValue = filtin + prevbandpass[num] * resonance + prevlowpass[num];
+    if (memory[SIDaddr + 0x18] & Bitmask.HIGHPASS) output -= filterValue;
+    filterValue = prevbandpass[num] - filterValue * cutoff;
+    prevbandpass[num] = filterValue;
+    if (memory[SIDaddr + 0x18] & Bitmask.BANDPASS) output -= filterValue;
+    filterValue = prevlowpass[num] + filterValue * cutoff;
+    prevlowpass[num] = filterValue;
+    if (memory[SIDaddr + 0x18] & Bitmask.LOWPASS) output += filterValue;
 
     //when it comes to $D418 volume-register digi playback, I made an AC / DC separation for $D418 value in the SwinSID at low (20Hz or so) cutoff-frequency,
     //and sent the AC (highpass) value to a 4th 'digi' channel mixed to the master output, and set ONLY the DC (lowpass) value to the volume-control.
@@ -365,46 +361,6 @@ export function createSID(
     return (output / OUTPUT_SCALEDOWN) * (memory[SIDaddr + 0x18] & 0xf);
     // SID output
   }
-
-  //And now, the combined waveforms. The resid source simply uses 4kbyte 8bit samples from wavetable arrays, says these waveforms are mystic due to the analog behaviour.
-  //It's true, the analog things inside SID play a significant role in how the combined waveforms look like, but process variations are not so huge that cause much differences in SIDs.
-  //After checking these waveforms by eyes, it turned out for me that these waveform are fractal-like, recursively approachable waveforms.
-  //My 1st thought and trial was to store only a portion of the waveforms in table, and magnify them depending on phase-accumulator's state.
-  //But I wanted to understand how these waveforms are produced. I felt from the waveform-diagrams that the bits of the waveforms affect each other,
-  //hence the recursive look. A short C code proved by assumption, I could generate something like a pulse+saw combined waveform.
-  //Recursive calculations were not feasible for MCU of SwinSID, but for jsSID I could utilize what I found out and code below generates the combined waveforms into wavetables.
-  //To approach the combined waveforms as much as possible, I checked out the SID schematic that can be found at some reverse-engineering sites...
-  //The SID's R-2R ladder WAVE DAC is driven by operation-amplifier like complementary FET output drivers, so that's not the place where I first thought the magic happens.
-  //These 'opamps' (for all 12 wave-bits) have single FETs as inputs, and they switch on above a certain level of input-voltage, causing 0 or 1 bit as R-2R DAC input.
-  //So the first keyword for the workings is TRESHOLD. These FET inputs are driven through serial switch FETs (wave-selector) that normally enables one waveform at a time.
-  //The phase-accumulator's output is brought to 3 kinds of circuitries for the 3 basic waveforms. The pulse simply drives
-  //all wave-selector inputs with a 0/1 depending on pulsewidth, the sawtooth has a XOR for triangle/ringmod generation, but what
-  //is common for all waveforms, they have an open-drain driver before the wave-selector, which has FETs towards GND and 'FET resistor' towards the power-supply rail.
-  //These outputs are clearly not designed to drive high loads, and normally they only have to drive the FETs input mentioned above.
-  //But when more of these output drivers are switched together by the switch-FETs in the wave-selector, they affect each other by loading each other.
-  //The pulse waveform, when selected, connects all of them together through a fairly strong connection, and its signal also affects the analog level (pulls below the treshold)...
-  //The farther a specific DAC bit driver is from the other, the less it affects its output. It turned out it's not powers of 2 but something else,
-  //that creates similar combined waveforms to that of real SID's...
-  //The analog levels that get generated by the various bit drivers, that pull each other up/down depends on the resistances the components inside the SID have.
-  //And finally, what is output on the DAC depends on whether these analog levels are below or above the FET gate's treshold-level,
-  //That's how the combined waveform is generated. Maybe I couldn't explain well enough, but the code below is simple enough to understand the mechanism algoritmically.
-  //This simplified schematic exapmle might make it easier to understand sawtooth+pulse combination (must be observed with monospace fonts):
-  //                               _____            |-    .--------------.   /\/\--.
-  // Vsupply                /  .----| |---------*---|-    /    Vsupply   !    R    !      As can be seen on this schematic,
-  //  ------.       other   !  !   _____        !  TRES   \       \      !         /      the pulse wave-selector FETs
-  //        !       saw bit *--!----| |---------'  HOLD   /       !     |-     2R  \      connect the neighbouring sawtooth
-  //        /       output  !  !                          !      |------|-         /      outputs with a fairly strong
-  //     Rd \              |-  !WAVEFORM-SELECTOR         *--*---|-      !    R    !      connection to each other through
-  //        /              |-  !SWITCHING FETs            !  !    !      *---/\/\--*      their own wave-selector FETs.
-  //        ! saw-bit          !    _____                |-  !   ---     !         !      So the adjacent sawtooth outputs
-  //        *------------------!-----| |-----------*-----|-  !          |-         /      pull each other upper/lower
-  //        ! (weak drive,so   !  saw switch       ! TRES-!  `----------|-     2R  \      depending on their low/high state and
-  //       |- can be shifted   !                   ! HOLD !              !         /      distance from each other, causing
-  //  -----|- by neighbours    !    _____          !      !              !     R   !      the resulting analog level that
-  //        ! up or down)      *-----| |-----------'     ---            ---   /\/\-*      will either turn the output on or not.
-  //   GND ---                 !  pulse switch                                     !      (Depending on their relation to treshold.)
-  //
-  //(As triangle waveform connects adjacent bits by default, the above explained effect becomes even stronger, that's why combined waveforms with thriangle are at 0 level most of the time.)
 
   function combinedWaveForm(
     num: number,
