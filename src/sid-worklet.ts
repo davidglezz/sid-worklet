@@ -69,7 +69,8 @@ class SIDProcessor
 
   getSongInfo() {
     return {
-      Name: `unknown`,
+      Name: `${this.sid.author} - ${this.sid.title}`,
+      Info: this.sid.info,
       Duration: 0,
     };
   }
