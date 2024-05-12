@@ -93,14 +93,14 @@ async function displaySongList() {
       section.style.containIntrinsicBlockSize = `${2.75 * (songs.length + 1)}rem`;
 
       const title = document.createElement('h3');
-      title.textContent = path;
+      title.textContent = path.substring(5);
       section.appendChild(title);
 
       songs.forEach(({ name, format }) => {
         const relativeUrl = `${path}/${name}.${format}`;
         const a = document.createElement('a');
         a.dataset.song = relativeUrl;
-        a.textContent = name;
+        a.textContent = name.replaceAll('_', ' ');
         a.href = `#${relativeUrl}`;
         section.appendChild(a);
       });
