@@ -15,7 +15,7 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
   let author = '';
   let info = '';
 
-  const timermode = new Uint8Array(0x20);
+  const timermode = new Uint8Array(32);
   let loadaddr = 0x1000;
   let initaddr = 0x1000;
   let playaddf = 0x1003;
@@ -62,11 +62,12 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
     for (let i = 0; i < 32; i++)
       timermode[31 - i] = filedata[0x12 + (i >> 3)] & (2 ** (7 - (i % 8)));
     memory.fill(0);
-    for (let i = offs + 2; i < filedata.byteLength; i++) {
-      const addr = loadaddr + i - (offs + 2);
-      if (addr < memory.length) {
-        memory[addr] = filedata[i];
-      }
+    for (
+      let i = offs + 2, addr = loadaddr;
+      i < filedata.byteLength && addr < memory.length;
+      i++, addr++
+    ) {
+      memory[addr] = filedata[i];
     }
     title = getString(filedata, 0x16);
     author = getString(filedata, 0x36);
