@@ -71,35 +71,40 @@ interface Song {
 }
 async function loadSongList(): Promise<Song[]> {
   const regex = /^(?<size>\d+)\s(?<path>.*)\/(?<name>.+)\.(?<format>.+)/;
-  const response = await fetch('songlist-demo.txt');
-  const data = (await response.text()).split('\n').filter(Boolean);
-  return data.map(line => regex.exec(line)?.groups).filter(Boolean) as unknown as Song[];
+  const response = await fetch('songlist.txt');
+  return (await response.text())
+    .split('\n')
+    .filter(Boolean)
+    .map(line => regex.exec(line)?.groups)
+    .filter(Boolean) as unknown as Song[];
 }
 
 async function displaySongList() {
   const list = document.querySelector<HTMLDListElement>('#songlist')!;
+  const listContent = document.createElement('div');
+
   const songs = await loadSongList();
   Object.entries(Object.groupBy(songs, (s: Song) => s.path)).forEach(
     ([path, songs]: [string, Song[] | undefined]) => {
+      if (!songs) return;
       const section = document.createElement('section');
       list.appendChild(section);
+
+      section.style.containIntrinsicBlockSize = `${2.75 * (songs.length + 1)}rem`;
 
       const title = document.createElement('h3');
       title.textContent = path;
       section.appendChild(title);
 
-      const ul = document.createElement('ul');
-      section.appendChild(ul);
-      songs?.forEach(({ name, format }) => {
+      songs.forEach(({ name, format }) => {
         const relativeUrl = `${path}/${name}.${format}`;
-        const li = document.createElement('li');
-        ul.appendChild(li);
         const a = document.createElement('a');
         a.dataset.song = relativeUrl;
         a.textContent = name;
         a.href = `#${relativeUrl}`;
-        li.appendChild(a);
+        section.appendChild(a);
       });
     },
   );
+  list.appendChild(listContent);
 }

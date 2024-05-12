@@ -38,6 +38,11 @@
   padding: 0;
 }
 
+:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 0.125rem var(--primary);
+}
+
 a {
   font-weight: 500;
   color: var(--primary);
@@ -105,12 +110,6 @@ button {
     border-color: var(--primary);
   }
 
-  &:focus,
-  &:focus-visible {
-    outline: none;
-    box-shadow: inset 0 0 0 0.125rem var(--primary);
-  }
-
   &.btn-icon {
     display: flex;
     aspect-ratio: 1;
@@ -156,49 +155,43 @@ button {
   overflow-y: auto;
   padding: 0 0.5rem;
 
-  ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
+  section {
+    content-visibility: auto;
   }
 
   h3 {
-    position: sticky;
-    top: 0;
+    /*position: sticky;
+    top: 0;*/
     font-weight: bold;
+    line-height: 1.5rem;
     padding: 0.5rem 1rem;
-    margin: 0.25rem 0;
+    margin: 0 0 0.25rem 0;
     border-radius: 0.5rem;
     background-color: var(--bg-active);
     box-shadow: 0 0 0 0.25rem var(--bg-color);
   }
 
-  li {
-    margin: 0rem;
+  a {
+    border-radius: 0.5rem;
+    cursor: pointer;
+    display: block;
+    padding: 0.5rem 1rem;
+    margin: 0 0 0.25rem 0;
+    color: inherit;
+    text-decoration: none;
+    transition: background-color 0.2s;
 
-    a {
-      border-radius: 0.5rem;
-      border: 0.0625rem solid transparent;
-      cursor: pointer;
-      display: block;
-      padding: 0.5rem 1rem;
-      margin: 0.25rem 0;
-      color: inherit;
-      text-decoration: none;
-      transition: background-color 0.2s;
+    &:hover {
+      background-color: var(--bg-active);
+    }
 
-      &:hover {
-        background-color: var(--bg-active);
-      }
+    &:active {
+      box-shadow: inset 0 0 0 0.125rem var(--primary);
+    }
 
-      &:active {
-        border-color: var(--primary);
-      }
-
-      &.active {
-        background-color: var(--bg-active);
-        color: var(--primary);
-      }
+    &.active {
+      background-color: var(--bg-active);
+      color: var(--primary);
     }
   }
 }
