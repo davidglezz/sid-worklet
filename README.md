@@ -2,4 +2,4 @@
 
 SID Player using AudioWorklet
 
-- https://github.com/og2t/jsSID
+This is derived from jsSID (https://github.com/og2t/jsSID)
