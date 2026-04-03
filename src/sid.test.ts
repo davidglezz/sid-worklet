@@ -23,7 +23,7 @@ describe('test SID', () => {
     ['sawscaletest', ''],
     ['sndstarttest', ''],
   ])('%s', (file, _sha256) => {
-    it(`progressive compare`, ({ expect }) => {
+    it(`progressive compare ${file}`, ({ expect }) => {
       const sampleRate = 44100;
       const songBytes = toArrayBuffer(readFileSync(`test-songs/${file}.sid`));
 
