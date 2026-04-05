@@ -18,12 +18,12 @@ export class AudioPlayer extends EventTarget {
     super();
     this.context = new AudioContext({ sampleRate: 44100 }); // SID.SAMPLE_RATE
     if (this.context.state === 'running') {
-      this.context.suspend();
+      void this.context.suspend();
     }
     this.gainNode = this.context.createGain();
     this.gainNode.connect(this.context.destination);
 
-    this.context.audioWorklet.addModule(SIDProcessor).then(() => {
+    void this.context.audioWorklet.addModule(SIDProcessor).then(() => {
       this.playerNode = new SIDNode(this.context);
       this.playerNode.on('position', ({ detail }) => {
         this.dispatchEvent(new PositionEvent(detail.value));
@@ -75,7 +75,7 @@ export class AudioPlayer extends EventTarget {
 
   async load(url: string) {
     const songData = await this.download(url);
-    await this.playerNode.load(songData);
+    this.playerNode.load(songData);
   }
 
   setPosition(value: number) {
@@ -98,22 +98,30 @@ export class AudioPlayer extends EventTarget {
 }
 
 export class PositionEvent extends Event {
-  constructor(readonly value: number) {
+  readonly value: number;
+
+  constructor(value: number) {
     super('position');
+    this.value = value;
   }
 }
 
 export class SongInfoEvent extends Event {
-  constructor(readonly songInfo: any) {
+  readonly songInfo: any;
+
+  constructor(songInfo: any) {
     super('songInfo');
+    this.songInfo = songInfo;
   }
 }
 
 export class LogEvent extends Event {
-  constructor(
-    readonly severity: 'info' | 'warn' | 'error',
-    readonly message: string,
-  ) {
+  readonly severity: 'info' | 'warn' | 'error';
+  readonly message: string;
+
+  constructor(severity: 'info' | 'warn' | 'error', message: string) {
     super('log');
+    this.severity = severity;
+    this.message = message;
   }
 }

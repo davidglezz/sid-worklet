@@ -26,10 +26,10 @@ player.on('log', ({ severity, message }: LogEvent) => console[severity](message)
 player.on('ready', async () => {
   player.connectVisualizer(visualizer.getNode());
   await displaySongList();
-  load(location.hash.slice(1));
+  await load(location.hash.slice(1));
 });
-player.on('position', e => (parts.position.value = String(e.value)));
-player.on('statechange', audioCtx => {
+player.on('position', (e) => (parts.position.value = String(e.value)));
+player.on('statechange', (audioCtx) => {
   parts.play.innerHTML = icons[audioCtx.state === 'running' ? 'stop' : 'play'];
 });
 player.on('songInfo', ({ songInfo }) => {
@@ -39,12 +39,12 @@ player.on('songInfo', ({ songInfo }) => {
 });
 parts.visualizer.onclick = async () => visualizer.next();
 parts.play.onclick = async () => player.togglePlay();
-parts.volume.oninput = event => {
+parts.volume.oninput = (event) => {
   const value = (event.target as HTMLInputElement).value;
-  player.setVolume(Number(value));
+  void player.setVolume(Number(value));
   parts.volumeLabel.textContent = `${Math.round(Number(value) * 100)}%`;
 };
-parts.position.oninput = event => {
+parts.position.oninput = (event) => {
   player.setPosition(Number((event.target as HTMLInputElement).value));
 };
 window.onhashchange = () => play(location.hash.slice(1));
@@ -60,7 +60,7 @@ async function load(songName: string) {
 
 async function play(songName: string) {
   await load(songName);
-  player.play();
+  await player.play();
 }
 
 interface Song {
@@ -75,7 +75,7 @@ async function loadSongList(): Promise<Song[]> {
   return (await response.text())
     .split('\n')
     .filter(Boolean)
-    .map(line => regex.exec(line)?.groups)
+    .map((line) => regex.exec(line)?.groups)
     .filter(Boolean) as unknown as Song[];
 }
 

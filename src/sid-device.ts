@@ -1,23 +1,23 @@
 const SID_CHANNEL_AMOUNT = 3;
 const OUTPUT_SCALEDOWN = 0x10000 * SID_CHANNEL_AMOUNT * 16;
 
-const enum Bitmask {
-  GATE = 0x01,
-  SYNC = 0x02,
-  RING = 0x04,
-  TEST = 0x08,
-  TRI = 0x10,
-  SAW = 0x20,
-  PULSE = 0x40,
-  NOISE = 0x80,
-  HOLDZERO = 0x10,
-  DECAYSUSTAIN = 0x40,
-  ATTACK = 0x80,
-  LOWPASS = 0x10,
-  BANDPASS = 0x20,
-  HIGHPASS = 0x40,
-  OFF3 = 0x80,
-}
+const Bitmask = {
+  GATE: 0x01,
+  SYNC: 0x02,
+  RING: 0x04,
+  TEST: 0x08,
+  TRI: 0x10,
+  SAW: 0x20,
+  PULSE: 0x40,
+  NOISE: 0x80,
+  HOLDZERO: 0x10,
+  DECAYSUSTAIN: 0x40,
+  ATTACK: 0x80,
+  LOWPASS: 0x10,
+  BANDPASS: 0x20,
+  HIGHPASS: 0x40,
+  OFF3: 0x80,
+} as const;
 
 // ADSR constants
 const ADSRperiods = [
@@ -147,9 +147,11 @@ export function createSID(
 
       //set ADSR period that should be checked against rate-counter (depending on ADSR state Attack/DecaySustain/Release)
       const periodStep =
-        ADSRstate[channel] & Bitmask.ATTACK ? memory[chnadd + 5] >> 4
-        : ADSRstate[channel] & Bitmask.DECAYSUSTAIN ? memory[chnadd + 5] & 0xf
-        : SR & 0xf;
+        ADSRstate[channel] & Bitmask.ATTACK
+          ? memory[chnadd + 5] >> 4
+          : ADSRstate[channel] & Bitmask.DECAYSUSTAIN
+            ? memory[chnadd + 5] & 0xf
+            : SR & 0xf;
       const period = ADSRperiods[periodStep];
       const step = ADSRstep[periodStep];
 
@@ -213,16 +215,16 @@ export function createSID(
         }
         //we simply zero output when other waveform is mixed with noise. On real SID LFSR continuously gets filled by zero and locks up. ($C1 waveform with pw<8 can keep it for a while...)
         wfout =
-          wf & 0x70 ? 0 : (
-            ((noiseLFSR & 0x100000) >> 5) +
-            ((noiseLFSR & 0x40000) >> 4) +
-            ((noiseLFSR & 0x4000) >> 1) +
-            ((noiseLFSR & 0x800) << 1) +
-            ((noiseLFSR & 0x200) << 2) +
-            ((noiseLFSR & 0x20) << 5) +
-            ((noiseLFSR & 0x04) << 7) +
-            ((noiseLFSR & 0x01) << 8)
-          );
+          wf & 0x70
+            ? 0
+            : ((noiseLFSR & 0x100000) >> 5) +
+              ((noiseLFSR & 0x40000) >> 4) +
+              ((noiseLFSR & 0x4000) >> 1) +
+              ((noiseLFSR & 0x800) << 1) +
+              ((noiseLFSR & 0x200) << 2) +
+              ((noiseLFSR & 0x20) << 5) +
+              ((noiseLFSR & 0x04) << 7) +
+              ((noiseLFSR & 0x01) << 8);
       } else if (wf & Bitmask.PULSE) {
         //simple pulse
         let pw = (memory[chnadd + 2] + (memory[chnadd + 3] & 0xf) * 256) * 16;
