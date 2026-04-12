@@ -19,10 +19,7 @@ jobs:
 
       - name: Conventional Commits Check
         if: github.event_name == 'pull_request'
-        uses: davidglezz/action-conventional-commits-check@v1.0.0
-        with:
-          target-branch: ${{ github.event.pull_request.base.ref }}
-          current-branch: ${{ github.event.pull_request.head.ref }}
+        uses: davidglezz/action-conventional-commits-check@v2.0.0
 
       - name: Setup Vite+ and Node.js
         uses: voidzero-dev/setup-vp@v1
