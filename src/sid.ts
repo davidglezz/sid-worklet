@@ -184,9 +184,16 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
 
   function seek(seconds: number) {
     if (!loaded) return;
-    init(subtune);
-    const targetSamples = Math.floor(seconds * samplerate);
-    for (let i = 0; i < targetSamples; i++) {
+    const targetSeconds = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
+
+    // Absolute seek: if rewinding, reset the emulator; if forwarding, advance from current playtime.
+    if (targetSeconds < playtime) {
+      init(subtune);
+    }
+
+    const currentSamples = Math.floor(playtime * samplerate);
+    const targetSamples = Math.floor(targetSeconds * samplerate);
+    for (let i = currentSamples; i < targetSamples; i++) {
       play();
     }
   }

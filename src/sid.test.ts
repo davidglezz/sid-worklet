@@ -99,6 +99,30 @@ describe('seek', () => {
     expect(sid.playtime).toBeLessThan(target + 1 / sampleRate);
   });
 
+  it('seek remains absolute after partial playback', ({ expect }) => {
+    const songBytes = toArrayBuffer(readFileSync(`test-songs/${file}.sid`));
+    const verifyCount = 200;
+
+    const ref = SIDPlayer(sampleRate);
+    ref.load(songBytes);
+    const absoluteTarget = 0.6;
+    const absoluteTargetSamples = Math.floor(absoluteTarget * sampleRate);
+    for (let i = 0; i < absoluteTargetSamples; i++) ref.play();
+    const expected: number[] = [];
+    for (let i = 0; i < verifyCount; i++) expected.push(ref.play());
+
+    const sid = SIDPlayer(sampleRate);
+    sid.load(songBytes);
+    const preRoll = Math.floor(0.2 * sampleRate);
+    for (let i = 0; i < preRoll; i++) sid.play();
+    sid.seek(absoluteTarget);
+
+    const actual: number[] = [];
+    for (let i = 0; i < verifyCount; i++) actual.push(sid.play());
+
+    expect(actual).toEqual(expected);
+  });
+
   it('seek does nothing when no song is loaded', ({ expect }) => {
     const sid = SIDPlayer(sampleRate);
     expect(() => sid.seek(1)).not.toThrow();
