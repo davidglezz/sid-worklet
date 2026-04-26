@@ -1,24 +1,19 @@
-import { resolve } from 'node:path';
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from 'vite-plus';
 
 export default defineConfig({
+  fmt: {
+    singleQuote: true,
+  },
+  staged: {
+    '*': 'vp check --fix',
+  },
+  lint: { options: { typeAware: true, typeCheck: true } },
   test: {
     coverage: {
       provider: 'v8',
       exclude: ['**/*.bench.ts', '**/*.d.ts', 'src/main.ts', 'src/utils.ts', 'src/counter.ts'],
+      reporter: ['text', 'html'],
     },
-    reporters: ['default'],
-  },
-  build: {
-    target: 'esnext',
   },
   base: '/sid-worklet/',
-  resolve: {
-    alias: [
-      {
-        find: '@',
-        replacement: resolve(__dirname, './src'),
-      },
-    ],
-  },
 });

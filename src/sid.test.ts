@@ -1,9 +1,8 @@
 import { readFileSync } from 'node:fs';
+import type { Buffer } from 'node:buffer';
 import { describe, it } from 'vitest';
-// @ts-expect-error - no types
 import { jsSID as ReferenceSID } from './sid.reference-implementation.js';
 import { SIDPlayer } from './sid.ts';
-import { toArrayBuffer } from './utils.ts';
 
 describe('test SID', () => {
   describe.each([
@@ -23,11 +22,11 @@ describe('test SID', () => {
     ['sawscaletest', ''],
     ['sndstarttest', ''],
   ])('%s', (file, _sha256) => {
-    it(`progressive compare`, ({ expect }) => {
+    it(`progressive compare ${file}`, ({ expect }) => {
       const sampleRate = 44100;
       const songBytes = toArrayBuffer(readFileSync(`test-songs/${file}.sid`));
 
-      const referenceSID = new ReferenceSID(sampleRate, 0);
+      const referenceSID = new (ReferenceSID as any)(sampleRate, 0);
       referenceSID.load(songBytes);
 
       const sid = SIDPlayer(sampleRate);
@@ -42,3 +41,7 @@ describe('test SID', () => {
     });
   });
 });
+
+function toArrayBuffer(buffer: Buffer) {
+  return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+}

@@ -1,55 +1,38 @@
 {
   "name": "sid-worklet",
-  "type": "module",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "prepare": "simple-git-hooks",
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
-    "format": "prettier --write .",
-    "format-check": "prettier --check .",
-    "lint": "eslint . --fix",
-    "lint-check": "eslint .",
+    "prepare": "vp config",
+    "dev": "vp dev",
+    "build": "tsc && vp build",
+    "preview": "vp preview",
+    "format": "vp fmt --write .",
+    "format-check": "vp fmt --check .",
+    "lint": "vp lint . --fix",
+    "lint-check": "vp lint .",
     "type-check": "tsc --noEmit --composite false",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
-    "bench": "vitest bench"
+    "test": "vp test run",
+    "test:coverage": "vp test run --coverage",
+    "bench": "vp test bench"
+  },
+  "dependencies": {
+    "vitest": "npm:@voidzero-dev/vite-plus-test@^0.1.19"
   },
   "devDependencies": {
-    "@antfu/eslint-config": "^2.8.3",
     "@types/audioworklet": "^0.0.54",
-    "@types/node": "^20.11.30",
-    "@vitest/coverage-v8": "^1.4.0",
-    "eslint": "^8.57.0",
-    "lint-staged": "^15.2.2",
-    "prettier": "^3.2.5",
-    "simple-git-hooks": "^2.11.0",
-    "typescript": "^5.4.3",
-    "vite": "^5.2.2",
-    "vitest": "^1.4.0"
+    "@types/node": "^24.12.2",
+    "@vitest/coverage-v8": "^2.1.9",
+    "typescript": "^6.0.3",
+    "vite": "npm:@voidzero-dev/vite-plus-core@^0.1.19",
+    "vite-plus": "latest"
   },
-  "simple-git-hooks": {
-    "commit-msg": "npx --no -- commitlint --edit",
-    "pre-commit": "npx --no -- lint-staged",
-    "pre-push": "npm run test"
-  },
-  "lint-staged": {
-    "*": [
-      "eslint --fix",
-      "prettier --write --list-different --ignore-unknown"
-    ]
-  },
-  "commitlint": {
-    "extends": [
-      "@commitlint/config-conventional"
-    ]
-  },
-  "prettier": {
-    "arrowParens": "avoid",
-    "printWidth": 100,
-    "singleQuote": true,
-    "experimentalTernaries": true
+  "packageManager": "pnpm@10.33.0",
+  "pnpm": {
+    "overrides": {
+      "vite": "npm:@voidzero-dev/vite-plus-core@latest",
+      "vitest": "npm:@voidzero-dev/vite-plus-test@latest"
+    }
   }
 }

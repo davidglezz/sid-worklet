@@ -201,10 +201,7 @@ export function createCPU(memory: Uint8Array) {
           }
           break;
         case 0xa0: //DEX
-          X =
-            (IR & 0xf) !== 0xa ? memory[addr]
-            : IR & 0x10 ? SP
-            : A;
+          X = (IR & 0xf) !== 0xa ? memory[addr] : IR & 0x10 ? SP : A;
           ST = (ST & 125) | (+!X << 1) | (X & 128);
           break;
         case 0x80: //LDX/TSX/TAX

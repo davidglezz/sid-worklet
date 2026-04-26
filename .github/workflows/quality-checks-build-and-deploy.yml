@@ -19,34 +19,24 @@ jobs:
 
       - name: Conventional Commits Check
         if: github.event_name == 'pull_request'
-        uses: davidglezz/action-conventional-commits-check@v1.0.0
-        with:
-          target-branch: ${{ github.event.pull_request.base.ref }}
-          current-branch: ${{ github.event.pull_request.head.ref }}
+        uses: davidglezz/action-conventional-commits-check@v2.0.0
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Vite+ and Node.js
+        uses: voidzero-dev/setup-vp@v1
         with:
-          node-version-file: .nvmrc
-          cache: npm
+          cache: true
 
       - name: Install dependencies
-        run: npm ci
+        run: vp install
 
-      - name: Prettier
-        run: npm run format-check
+      - name: Run format, lint and type checks
+        run: vp check
 
-      - name: Typecheck
-        run: npm run type-check
-
-      - name: Linter
-        run: npm run lint-check
-
-      - name: Unit test
-        run: npm run test
+      - name: Unit tests
+        run: vp test
 
       - name: Build
-        run: npm run build
+        run: vp build
 
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v3

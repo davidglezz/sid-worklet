@@ -50,15 +50,15 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
     SID.init();
   }
 
-  function load(data: ArrayBuffer, subt = 0) {
+  function load(data: ArrayBuffer | SharedArrayBuffer, subt = 0) {
     subtune = subt;
     const filedata = new Uint8Array(data);
     //SID-file format information can be found at HVSC
     const offs = filedata[7];
     loadaddr =
-      filedata[8] + filedata[9] ?
-        filedata[8] * 256 + filedata[9]
-      : filedata[offs] + filedata[offs + 1] * 256;
+      filedata[8] + filedata[9]
+        ? filedata[8] * 256 + filedata[9]
+        : filedata[offs] + filedata[offs + 1] * 256;
     for (let i = 0; i < 32; i++)
       timermode[31 - i] = filedata[0x12 + (i >> 3)] & (2 ** (7 - (i % 8)));
     memory.fill(0);
@@ -80,13 +80,13 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
     SID_model[1] = (filedata[0x77] & 0xc0) >= 0x80 ? 8580 : 6581;
     SID_model[2] = (filedata[0x76] & 3) >= 3 ? 8580 : 6581;
     SID_address[1] =
-      filedata[0x7a] >= 0x42 && (filedata[0x7a] < 0x80 || filedata[0x7a] >= 0xe0) ?
-        0xd000 + filedata[0x7a] * 16
-      : 0;
+      filedata[0x7a] >= 0x42 && (filedata[0x7a] < 0x80 || filedata[0x7a] >= 0xe0)
+        ? 0xd000 + filedata[0x7a] * 16
+        : 0;
     SID_address[2] =
-      filedata[0x7b] >= 0x42 && (filedata[0x7b] < 0x80 || filedata[0x7b] >= 0xe0) ?
-        0xd000 + filedata[0x7b] * 16
-      : 0;
+      filedata[0x7b] >= 0x42 && (filedata[0x7b] < 0x80 || filedata[0x7b] >= 0xe0)
+        ? 0xd000 + filedata[0x7b] * 16
+        : 0;
     SIDamount = 0;
     if (SID_address[1] > 0) SIDamount++;
     if (SID_address[2] > 0) SIDamount++;
@@ -117,9 +117,9 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
       //frame_sampleperiod = (memory[0xDC05]!=0 || (!timermode[subtune] && playaddf))? samplerate/PAL_FRAMERATE : (memory[0xDC04] + memory[0xDC05]*256) / clk_ratio;
       if (playaddf === 0)
         playaddr =
-          (memory[1] & 3) < 2 ?
-            memory[0xfffe] + memory[0xffff] * 256
-          : memory[0x314] + memory[0x315] * 256;
+          (memory[1] & 3) < 2
+            ? memory[0xfffe] + memory[0xffff] * 256
+            : memory[0x314] + memory[0x315] * 256;
       else {
         playaddr = playaddf;
         if (playaddr >= 0xe000 && memory[1] === 0x37) memory[1] = 0x35;
