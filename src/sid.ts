@@ -182,6 +182,15 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
     return mix * volume * SIDamount_vol[SIDamount];
   }
 
+  function seek(seconds: number) {
+    if (!loaded) return;
+    init(subtune);
+    const targetSamples = Math.floor(seconds * samplerate);
+    for (let i = 0; i < targetSamples; i++) {
+      play();
+    }
+  }
+
   function setEndCallback(callback: () => void, seconds: number) {
     endcallback = callback;
     playlength = seconds;
@@ -192,6 +201,7 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
     load,
     init,
     play,
+    seek,
     get playtime() {
       return playtime;
     },

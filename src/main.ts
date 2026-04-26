@@ -28,7 +28,9 @@ player.on('ready', async () => {
   await displaySongList();
   await load(location.hash.slice(1));
 });
-player.on('position', (e) => (parts.position.value = String(e.value)));
+player.on('position', (e) => {
+  if (!isDragging) parts.position.value = String(e.value);
+});
 player.on('statechange', (audioCtx) => {
   parts.play.innerHTML = icons[audioCtx.state === 'running' ? 'stop' : 'play'];
 });
@@ -44,8 +46,23 @@ parts.volume.oninput = (event) => {
   void player.setVolume(Number(value));
   parts.volumeLabel.textContent = `${Math.round(Number(value) * 100)}%`;
 };
+
+// Debounce seek so rapid scrubbing only sends the last position.
+let seekTimer: ReturnType<typeof setTimeout> | null = null;
+let isDragging = false;
+const onPointerDown = () => (isDragging = true);
+parts.position.addEventListener('mousedown', onPointerDown);
+parts.position.addEventListener('touchstart', onPointerDown);
+const onPointerUp = () => (isDragging = false);
+parts.position.addEventListener('mouseup', onPointerUp);
+parts.position.addEventListener('touchend', onPointerUp);
 parts.position.oninput = (event) => {
-  player.setPosition(Number((event.target as HTMLInputElement).value));
+  const seconds = Number((event.target as HTMLInputElement).value);
+  if (seekTimer !== null) clearTimeout(seekTimer);
+  seekTimer = setTimeout(() => {
+    seekTimer = null;
+    player.setPosition(seconds);
+  }, 50);
 };
 window.onhashchange = () => play(location.hash.slice(1));
 

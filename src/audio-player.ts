@@ -78,8 +78,22 @@ export class AudioPlayer extends EventTarget {
     this.playerNode.load(songData);
   }
 
+  /**
+   * Seek to a position in the current song.
+   * @param value Position in seconds (canonical unit).
+   */
   setPosition(value: number) {
     this.playerNode.setPosition(value);
+  }
+
+  /**
+   * Seek to a position expressed as a fraction of the total duration [0, 1].
+   * Requires a known duration; if duration is 0 the call is ignored.
+   */
+  setPositionPercent(percent: number, durationSeconds: number) {
+    if (durationSeconds <= 0) return;
+    const clamped = Math.max(0, Math.min(1, percent));
+    this.playerNode.setPosition(clamped * durationSeconds);
   }
 
   connectVisualizer(visualizer: AudioNode) {

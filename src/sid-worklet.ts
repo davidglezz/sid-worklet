@@ -34,6 +34,12 @@ class SIDProcessor
   implements AudioWorkletProcessorImpl, MessageHandler
 {
   sid = SIDPlayer(/*sampleRate*/);
+  /** Pending seek target in seconds; null if no seek is queued (last-wins). */
+  private pendingSeek: number | null = null;
+  /** Sample counter used to throttle periodic position messages. */
+  private samplesSinceLastPosition = 0;
+  /** Emit a position message every ~100 ms (at 44100 Hz ≈ 4410 samples). */
+  private static readonly POSITION_INTERVAL = 4410;
 
   constructor() {
     super();
@@ -50,16 +56,32 @@ class SIDProcessor
     const left = output[0];
     const right = output[1];
 
+    // Apply pending seek (last-wins) before producing samples.
+    if (this.pendingSeek !== null) {
+      const target = this.pendingSeek;
+      this.pendingSeek = null;
+      this.sid.seek(target);
+      this.port.postMessage({ id: 'position', value: this.sid.playtime });
+      this.samplesSinceLastPosition = 0;
+    }
+
     for (let i = 0; i < length; i++) {
       left[i] = right[i] = this.sid.play();
     }
 
-    //this.port.postMessage({ id: 'position', value });
+    this.samplesSinceLastPosition += length;
+    if (this.samplesSinceLastPosition >= SIDProcessor.POSITION_INTERVAL) {
+      this.samplesSinceLastPosition = 0;
+      this.port.postMessage({ id: 'position', value: this.sid.playtime });
+    }
 
     return true;
   }
 
-  setPosition(_data: InputMessagesMap['setPosition']) {}
+  setPosition({ value }: InputMessagesMap['setPosition']) {
+    // value is in seconds; queue as pending (last-wins to avoid backlog).
+    this.pendingSeek = value;
+  }
 
   load({ songData }: InputMessagesMap['load']) {
     this.sid.load(songData, 0);

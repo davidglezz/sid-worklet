@@ -42,6 +42,71 @@ describe('test SID', () => {
   });
 });
 
+describe('seek', () => {
+  const file = 'adsrtest';
+  const sampleRate = 44100;
+
+  it('seek(0) produces same samples as fresh load', ({ expect }) => {
+    const songBytes = toArrayBuffer(readFileSync(`test-songs/${file}.sid`));
+    const sid = SIDPlayer(sampleRate);
+    sid.load(songBytes);
+
+    // Collect 100 samples from a fresh load.
+    const expected: number[] = [];
+    for (let i = 0; i < 100; i++) expected.push(sid.play());
+
+    // seek(0) should reset to the same initial state.
+    sid.seek(0);
+    const actual: number[] = [];
+    for (let i = 0; i < 100; i++) actual.push(sid.play());
+
+    expect(actual).toEqual(expected);
+  });
+
+  it('seek(T) then play matches playing continuously from 0 to T', ({ expect }) => {
+    const seekTarget = 0.5; // seconds
+    const verifyCount = 200; // samples to compare after seek point
+    const songBytes = toArrayBuffer(readFileSync(`test-songs/${file}.sid`));
+
+    // Reference: play from 0 straight through to T + verifyCount samples.
+    const ref = SIDPlayer(sampleRate);
+    ref.load(songBytes);
+    const targetSamples = Math.floor(seekTarget * sampleRate);
+    for (let i = 0; i < targetSamples; i++) ref.play();
+    const expected: number[] = [];
+    for (let i = 0; i < verifyCount; i++) expected.push(ref.play());
+
+    // Seeked player: load, seek(T), then play verifyCount samples.
+    const seeked = SIDPlayer(sampleRate);
+    seeked.load(songBytes);
+    seeked.seek(seekTarget);
+    const actual: number[] = [];
+    for (let i = 0; i < verifyCount; i++) actual.push(seeked.play());
+
+    expect(actual).toEqual(expected);
+  });
+
+  it('playtime reflects seek target', ({ expect }) => {
+    const songBytes = toArrayBuffer(readFileSync(`test-songs/${file}.sid`));
+    const sid = SIDPlayer(sampleRate);
+    sid.load(songBytes);
+
+    const target = 1.0;
+    sid.seek(target);
+    // playtime advances by 1/sampleRate per play() call so after
+    // floor(target * sampleRate) calls it should be within 1 sample of target.
+    expect(sid.playtime).toBeGreaterThanOrEqual(target - 1 / sampleRate);
+    expect(sid.playtime).toBeLessThan(target + 1 / sampleRate);
+  });
+
+  it('seek does nothing when no song is loaded', ({ expect }) => {
+    const sid = SIDPlayer(sampleRate);
+    expect(() => sid.seek(1)).not.toThrow();
+    // playtime should remain 0 (no advance occurred).
+    expect(sid.playtime).toBe(0);
+  });
+});
+
 function toArrayBuffer(buffer: Buffer) {
   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
 }
