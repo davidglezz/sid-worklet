@@ -86,3 +86,34 @@ For GitHub Actions, consider using [`voidzero-dev/setup-vp`](https://github.com/
 - [ ] Run `vp install` after pulling remote changes and before getting started.
 - [ ] Run `vp check` and `vp test` to validate changes.
 <!--VITE PLUS END-->
+
+---
+
+# SID Worklet — Project-Specific Instructions
+
+A Commodore 64 SID chip emulator running as a Web Audio API `AudioWorklet`. Derived from [jsSID](https://github.com/og2t/jsSID).
+
+## Architecture
+
+```
+src/cpu.ts             — 6502 CPU emulator
+src/sid-device.ts      — SID chip hardware emulator (registers, voices, envelope, filters)
+src/sid.ts             — SIDPlayer: combines CPU + SID, parses .sid files, exposes play()/seek()
+src/sid-worklet.ts     — AudioWorkletProcessor (audio thread — NOT the main thread)
+src/sid-node.ts        — AudioWorkletNode (main thread; typed message bridge to worklet)
+src/audio-player.ts    — High-level EventTarget API: load/play/pause/seek/volume/events
+src/audio-visualizer.ts — Canvas waveform/spectrum visualizer
+src/main.ts            — Demo UI (not unit-tested)
+```
+
+See [README.md](../README.md) for the public `AudioPlayer` API and seek behaviour details.
+
+## Key Constraints
+
+- **`sid-worklet.ts` runs in `AudioWorkletGlobalScope`** (audio thread), not the main thread. APIs unavailable there (e.g. `TextDecoder`) must be polyfilled at the top of that file.
+- **Typed message passing**: add new cross-thread messages to `InputMessagesMap` / `OutputMessagesMap` in `sid-worklet.ts`.
+- **Last-wins seek**: `pendingSeek` stores only the last `setPosition` call per audio block to prevent backlog on rapid scrubbing.
+- **Sample rate is fixed** at 44100 Hz (`AudioContext({ sampleRate: 44100 })`).
+- **Base path**: `/sid-worklet/` (configured in `vite.config.ts`).
+- `.sid` test fixtures live in `test-songs/`.
+- Use **single quotes** (enforced by formatter).
