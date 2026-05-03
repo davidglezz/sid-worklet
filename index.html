@@ -15,7 +15,12 @@
         <button id="play" class="btn-icon" type="button"></button>
         <div class="position flex-col flex-fill">
           <label for="position">-</label>
-          <input id="position" type="range" min="0" max="300" step="1" value="0" />
+          <span id="time-indicator">00:00 / --:--</span>
+          <input id="position" type="range" min="0" max="0" step="1" value="0" />
+        </div>
+        <div class="subsong flex-col">
+          <label for="subsong">Subsong</label>
+          <select id="subsong" disabled></select>
         </div>
         <div class="volume flex-col">
           <label for="volume">100%</label>

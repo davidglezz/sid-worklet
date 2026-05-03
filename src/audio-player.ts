@@ -86,6 +86,10 @@ export class AudioPlayer extends EventTarget {
     this.playerNode.setPosition(value);
   }
 
+  setSubsong(value: number) {
+    this.playerNode.setSubsong(value);
+  }
+
   /**
    * Seek to a position expressed as a fraction of the total duration [0, 1].
    * Requires a known duration; if duration is 0 the call is ignored.

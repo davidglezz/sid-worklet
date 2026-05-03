@@ -7,14 +7,21 @@ const icons = {
   stop: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><title>stop</title><path d="M18,18H6V6H18V18Z" /></svg>`,
 };
 
+const appRoot = document.getElementById('app')!;
+const el = <T extends HTMLElement>(selector: string) => appRoot.querySelector<T>(selector)!;
 const parts = {
-  visualizer: document.querySelector<HTMLCanvasElement>('#visualizer')!,
-  play: document.querySelector<HTMLButtonElement>('#play')!,
-  position: document.querySelector<HTMLInputElement>('#position')!,
-  positionLabel: document.querySelector<HTMLInputElement>('[for=position]')!,
-  volume: document.querySelector<HTMLInputElement>('#volume')!,
-  volumeLabel: document.querySelector<HTMLInputElement>('[for=volume]')!,
-  songlist: document.querySelector<HTMLDivElement>('#songlist')!,
+  visualizer: el<HTMLCanvasElement>('#visualizer'),
+  play: el<HTMLButtonElement>('#play'),
+  position: el<HTMLInputElement>('#position'),
+  positionLabel: el<HTMLLabelElement>('[for=position]'),
+  subsong: el<HTMLSelectElement>('#subsong'),
+  time: el<HTMLSpanElement>('#time-indicator'),
+  volume: el<HTMLInputElement>('#volume'),
+  volumeLabel: el<HTMLLabelElement>('[for=volume]'),
+  songlist: el<HTMLDivElement>('#songlist'),
+  get currentSongLink() {
+    return this.songlist.querySelector<HTMLAnchorElement>('a.active[data-song]');
+  },
 };
 
 parts.play.innerHTML = icons.play;
@@ -30,13 +37,19 @@ player.on('ready', async () => {
 });
 player.on('position', (e) => {
   if (!isDragging) parts.position.value = String(e.value);
+  updateTimeIndicator();
 });
 player.on('statechange', (audioCtx) => {
   parts.play.innerHTML = icons[audioCtx.state === 'running' ? 'stop' : 'play'];
 });
 player.on('songInfo', ({ songInfo }) => {
   parts.positionLabel.textContent = songInfo.Name;
-  //parts.position.step = String(1 / songInfo.Positions.length);
+  setupSubsongSelector(songInfo.Subsongs);
+  if (typeof songInfo.Subsong === 'number') {
+    parts.subsong.value = String(songInfo.Subsong);
+    parts.position.max = `${getCurrentDuration()}`;
+  }
+  updateTimeIndicator();
   console.log(songInfo); // eslint-disable-line no-console
 });
 parts.visualizer.onclick = async () => visualizer.next();
@@ -45,6 +58,13 @@ parts.volume.oninput = (event) => {
   const value = (event.target as HTMLInputElement).value;
   void player.setVolume(Number(value));
   parts.volumeLabel.textContent = `${Math.round(Number(value) * 100)}%`;
+};
+parts.subsong.onchange = () => {
+  const value = Number(parts.subsong.value);
+  parts.position.value = '0';
+  parts.position.max = `${getCurrentDuration()}`;
+  updateTimeIndicator();
+  player.setSubsong(value);
 };
 
 // Debounce seek so rapid scrubbing only sends the last position.
@@ -58,6 +78,7 @@ parts.position.addEventListener('mouseup', onPointerUp);
 parts.position.addEventListener('touchend', onPointerUp);
 parts.position.oninput = (event) => {
   const seconds = Number((event.target as HTMLInputElement).value);
+  updateTimeIndicator();
   if (seekTimer !== null) clearTimeout(seekTimer);
   seekTimer = setTimeout(() => {
     seekTimer = null;
@@ -70,9 +91,17 @@ async function load(songName: string) {
   if (!songName) {
     return;
   }
-  parts.songlist.querySelector('.active')?.classList.remove('active');
-  parts.songlist.querySelector(`[href="#${songName}"]`)?.classList.add('active');
-  await player.load(`https://modland.com/pub/modules/${songName}`);
+
+  parts.currentSongLink?.classList.remove('active');
+  parts.songlist
+    .querySelector<HTMLAnchorElement>(`a[data-song="${CSS.escape(songName)}"]`)
+    ?.classList.add('active');
+
+  parts.subsong.value = '0';
+  parts.position.value = '0';
+  parts.position.max = `${getCurrentDuration()}`;
+  updateTimeIndicator();
+  await player.load(`https://modland.com/pub/modules/HVSC${songName}`);
 }
 
 async function play(songName: string) {
@@ -81,47 +110,122 @@ async function play(songName: string) {
 }
 
 interface Song {
-  size: string;
+  relativeUrl: string;
   path: string;
   name: string;
-  format: string;
+  durations: string[];
 }
-async function loadSongList(): Promise<Song[]> {
-  const regex = /^(?<size>\d+)\s(?<path>.*)\/(?<name>.+)\.(?<format>.+)/;
+
+async function* streamSongList(): AsyncGenerator<Song> {
   const response = await fetch('songlist.txt');
-  return (await response.text())
-    .split('\n')
-    .filter(Boolean)
-    .map((line) => regex.exec(line)?.groups)
-    .filter(Boolean) as unknown as Song[];
+  if (!response.ok || !response.body) {
+    throw new Error('Failed to load song list');
+  }
+  const textStream = response.body.pipeThrough(new TextDecoderStream());
+
+  for await (const line of splitLines(textStream)) {
+    const song = parseSongLine(line);
+    if (song) yield song;
+  }
 }
 
 async function displaySongList() {
-  const list = document.querySelector<HTMLDListElement>('#songlist')!;
-  const listContent = document.createElement('div');
+  let currentPath = '';
+  let currentSection: HTMLElement | null = null;
 
-  const songs = await loadSongList();
-  Object.entries(Object.groupBy(songs, (s: Song) => s.path)).forEach(
-    ([path, songs]: [string, Song[] | undefined]) => {
-      if (!songs) return;
-      const section = document.createElement('section');
-      list.appendChild(section);
-
-      section.style.containIntrinsicBlockSize = `${2.75 * (songs.length + 1)}rem`;
+  for await (const song of streamSongList()) {
+    if (song.path !== currentPath) {
+      currentPath = song.path;
+      currentSection = document.createElement('section');
+      parts.songlist.appendChild(currentSection);
 
       const title = document.createElement('h3');
-      title.textContent = path.substring(5);
-      section.appendChild(title);
+      title.textContent = currentPath;
+      currentSection.appendChild(title);
+    }
 
-      songs.forEach(({ name, format }) => {
-        const relativeUrl = `${path}/${name}.${format}`;
-        const a = document.createElement('a');
-        a.dataset.song = relativeUrl;
-        a.textContent = name.replaceAll('_', ' ');
-        a.href = `#${relativeUrl}`;
-        section.appendChild(a);
-      });
-    },
+    const link = document.createElement('a');
+    link.dataset.song = song.relativeUrl;
+    link.dataset.duration = song.durations.join(',');
+    link.textContent = song.name.replaceAll('_', ' ');
+    link.href = `#${song.relativeUrl}`;
+    currentSection?.appendChild(link);
+  }
+}
+
+function setupSubsongSelector(count: number) {
+  parts.subsong.innerHTML = '';
+  for (let i = 0; i < count; i++) {
+    const option = document.createElement('option');
+    option.value = String(i);
+    option.textContent = `Subsong ${i + 1}`;
+    parts.subsong.appendChild(option);
+  }
+  parts.subsong.disabled = count <= 1;
+  parts.subsong.value = '0';
+}
+
+function getCurrentDuration() {
+  return parseDuration(
+    (parts.currentSongLink?.dataset.duration ?? '').split(',').at(Number(parts.subsong.value)),
   );
-  list.appendChild(listContent);
+}
+
+function updateTimeIndicator() {
+  const total = getCurrentDuration();
+  const currentPosition = Number(parts.position.value);
+  const clamped =
+    total > 0 ? Math.min(Math.max(currentPosition, 0), total) : Math.max(currentPosition, 0);
+  parts.time.textContent = `${formatTime(clamped)} / ${total > 0 ? formatTime(total) : '--:--'}`;
+}
+
+async function* splitLines(stream: ReadableStream<string>) {
+  let pendingLine = '';
+
+  for await (const chunk of stream) {
+    pendingLine += chunk;
+
+    const lines = pendingLine.split('\n');
+    pendingLine = lines.pop() ?? '';
+
+    for (const line of lines) {
+      yield line;
+    }
+  }
+
+  if (pendingLine) {
+    yield pendingLine;
+  }
+}
+
+function parseSongLine(line: string) {
+  const [relativeUrl, ...durations] = line.trim().split('\t').filter(Boolean);
+  if (!relativeUrl) return null;
+
+  const pathSep = relativeUrl.lastIndexOf('/');
+  const fullName = pathSep >= 0 ? relativeUrl.slice(pathSep + 1) : relativeUrl;
+  const dotSep = fullName.lastIndexOf('.');
+
+  return {
+    relativeUrl,
+    path: pathSep >= 0 ? relativeUrl.slice(0, pathSep) : '',
+    name: dotSep >= 0 ? fullName.slice(0, dotSep) : fullName,
+    durations,
+  } satisfies Song;
+}
+
+function parseDuration(value: string | undefined) {
+  if (!value) return 0;
+  const [min, sec] = value.trim().split(':');
+  const minutes = Number(min);
+  const seconds = Number(sec);
+  if (!Number.isFinite(minutes) || !Number.isFinite(seconds)) return 0;
+  return Math.max(0, minutes * 60 + seconds);
+}
+
+function formatTime(value: number) {
+  const totalSeconds = Math.max(0, Math.floor(value));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }

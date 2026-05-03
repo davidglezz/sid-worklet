@@ -13,6 +13,7 @@ import { SIDPlayer } from './sid.ts';
 export interface InputMessagesMap {
   load: { songData: ArrayBuffer };
   setPosition: { value: number };
+  setSubsong: { value: number };
 }
 
 export interface OutputMessagesMap {
@@ -83,6 +84,13 @@ class SIDProcessor
     this.pendingSeek = value;
   }
 
+  setSubsong({ value }: InputMessagesMap['setSubsong']) {
+    const index = Math.max(0, Math.floor(value));
+    this.sid.init(index);
+    this.port.postMessage({ id: 'songInfo', songInfo: this.getSongInfo() });
+    this.port.postMessage({ id: 'position', value: 0 });
+  }
+
   load({ songData }: InputMessagesMap['load']) {
     this.sid.load(songData, 0);
     this.port.postMessage({ id: 'songInfo', songInfo: this.getSongInfo() });
@@ -94,6 +102,8 @@ class SIDProcessor
       Name: `${this.sid.author} - ${this.sid.title}`,
       Info: this.sid.info,
       Duration: 0,
+      Subsong: this.sid.subtune,
+      Subsongs: this.sid.subtunes,
     };
   }
 }

@@ -124,7 +124,7 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
         playaddr = playaddf;
         if (playaddr >= 0xe000 && memory[1] === 0x37) memory[1] = 0x35;
       }
-      //player under KERNAL (Crystal Kingdom Dizzy)
+
       CPU.init(playaddr);
       framecnt = 1;
       finished = 0;
@@ -220,6 +220,9 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
     },
     get subtunes() {
       return subtune_amount;
+    },
+    get subtune() {
+      return subtune;
     },
     get title() {
       return title;

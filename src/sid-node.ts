@@ -39,4 +39,8 @@ export class SIDNode extends AudioWorkletNode {
   setPosition(value: number) {
     this.sendMessage({ id: 'setPosition', value });
   }
+
+  setSubsong(value: number) {
+    this.sendMessage({ id: 'setSubsong', value });
+  }
 }
