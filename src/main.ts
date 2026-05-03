@@ -33,7 +33,8 @@ player.on('log', ({ severity, message }: LogEvent) => console[severity](message)
 player.on('ready', async () => {
   player.connectVisualizer(visualizer.getNode());
   await displaySongList();
-  await load(location.hash.slice(1));
+  const songName = location.hash.slice(1) || getRandomSong();
+  await load(songName);
 });
 player.on('position', (e) => {
   if (!isDragging) parts.position.value = String(e.value);
@@ -86,6 +87,11 @@ parts.position.oninput = (event) => {
   }, 50);
 };
 window.onhashchange = () => play(location.hash.slice(1));
+
+function getRandomSong(): string {
+  const songs = parts.songlist.querySelectorAll<HTMLAnchorElement>('a[data-song]');
+  return songs[Math.floor(Math.random() * songs.length)]?.dataset.song ?? '';
+}
 
 async function load(songName: string) {
   if (!songName) {
