@@ -149,6 +149,13 @@ async function displaySongList() {
     link.dataset.duration = song.durations.join(',');
     link.textContent = song.name.replaceAll('_', ' ');
     link.href = `#${song.relativeUrl}`;
+    const duration =
+      song.durations.length > 1
+        ? formatTime(song.durations.reduce((sum, d) => sum + parseDuration(d), 0))
+        : song.durations[0];
+    const durationSpan = document.createElement('span');
+    durationSpan.textContent = duration;
+    link.appendChild(durationSpan);
     currentSection?.appendChild(link);
   }
 }
