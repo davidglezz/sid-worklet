@@ -12,7 +12,16 @@
       <canvas id="visualizer" width="640" height="96"></canvas>
       <h1>SID worklet</h1>
       <div class="controls">
-        <button id="play" class="btn-icon" type="button"></button>
+        <button id="play" class="btn--icon" type="button">
+          <svg class="btn__play" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <title>play</title>
+            <path d="M8,5.14V19.14L19,12.14L8,5.14Z" />
+          </svg>
+          <svg class="btn__stop" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <title>stop</title>
+            <path d="M18,18H6V6H18V18Z" />
+          </svg>
+        </button>
         <div class="position flex-col flex-fill">
           <label for="position">-</label>
           <span id="time-indicator">00:00 / --:--</span>

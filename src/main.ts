@@ -2,11 +2,6 @@ import type { LogEvent } from './audio-player.ts';
 import { AudioPlayer } from './audio-player.ts';
 import { AudioVisualizer } from './audio-visualizer.ts';
 
-const icons = {
-  play: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><title>play</title><path d="M8,5.14V19.14L19,12.14L8,5.14Z" /></svg>`,
-  stop: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><title>stop</title><path d="M18,18H6V6H18V18Z" /></svg>`,
-};
-
 const appRoot = document.getElementById('app')!;
 const el = <T extends HTMLElement>(selector: string) => appRoot.querySelector<T>(selector)!;
 const parts = {
@@ -24,8 +19,6 @@ const parts = {
   },
 };
 
-parts.play.innerHTML = icons.play;
-
 const player = new AudioPlayer();
 const visualizer = new AudioVisualizer(player.context, parts.visualizer, 'sinewave');
 
@@ -41,7 +34,7 @@ player.on('position', (e) => {
   updateTimeIndicator();
 });
 player.on('statechange', (audioCtx) => {
-  parts.play.innerHTML = icons[audioCtx.state === 'running' ? 'stop' : 'play'];
+  parts.play.classList.toggle('btn--playing', audioCtx.state === 'running');
 });
 player.on('songInfo', ({ songInfo }) => {
   parts.positionLabel.textContent = songInfo.Name;

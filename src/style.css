@@ -110,7 +110,7 @@ button {
     border-color: var(--primary);
   }
 
-  &.btn-icon {
+  &.btn--icon {
     display: flex;
     aspect-ratio: 1;
     line-height: 1;
@@ -120,6 +120,22 @@ button {
     border-radius: 99rem;
     align-items: center;
     justify-content: center;
+  }
+
+  .btn__play {
+    display: block;
+  }
+  .btn__stop {
+    display: none;
+  }
+
+  &.btn--playing {
+    .btn__play {
+      display: none;
+    }
+    .btn__stop {
+      display: block;
+    }
   }
 }
 
