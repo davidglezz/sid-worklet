@@ -118,11 +118,8 @@ button {
     color: var(--fg-color);
     padding: 1rem;
     border-radius: 99rem;
-
-    svg {
-      width: 2rem;
-      height: 2rem;
-    }
+    align-items: center;
+    justify-content: center;
   }
 }
 
