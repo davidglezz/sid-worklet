@@ -233,7 +233,7 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
     get info() {
       return info;
     },
-    isEndded: () => ended === 1,
+    isEnded: () => ended === 1,
     SID_model,
     setEndCallback,
   };
