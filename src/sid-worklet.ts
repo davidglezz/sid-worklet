@@ -2,17 +2,6 @@ import { SIDPlayer } from './sid.ts';
 
 /// <reference types="@types/audioworklet" />
 
-// Polyfill TextDecoder for AudioWorkletGlobalScope (only when not already present).
-(globalThis as any).TextDecoder ??= class TextDecoder {
-  decode(buffer: Uint8Array): string {
-    let result = '';
-    for (let i = 0; i < buffer.length; i++) {
-      result += String.fromCharCode(buffer[i]);
-    }
-    return result;
-  }
-};
-
 /** Metadata for a loaded SID file. */
 export interface SongInfo {
   /** Author and title formatted as "Author - Title". */
