@@ -14,6 +14,8 @@ export class AudioPlayer extends EventTarget {
   public context: AudioContext;
   protected gainNode: GainNode;
   protected playerNode!: SIDNode;
+  /** Resolves once the AudioWorklet module is loaded and playerNode is ready. */
+  private readonly readyPromise: Promise<void>;
 
   constructor() {
     super();
@@ -24,7 +26,7 @@ export class AudioPlayer extends EventTarget {
     this.gainNode = this.context.createGain();
     this.gainNode.connect(this.context.destination);
 
-    void this.context.audioWorklet.addModule(SIDProcessor).then(() => {
+    this.readyPromise = this.context.audioWorklet.addModule(SIDProcessor).then(() => {
       this.playerNode = new SIDNode(this.context);
       this.playerNode.on('position', ({ detail }) => {
         this.dispatchEvent(new PositionEvent(detail.value));
@@ -76,6 +78,7 @@ export class AudioPlayer extends EventTarget {
   }
 
   async load(url: string) {
+    await this.readyPromise;
     const songData = await this.download(url);
     this.playerNode.load(songData);
   }
