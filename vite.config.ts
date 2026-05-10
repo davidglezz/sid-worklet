@@ -11,7 +11,7 @@ export default defineConfig({
   test: {
     coverage: {
       provider: 'v8',
-      exclude: ['**/*.bench.ts', '**/*.d.ts', 'src/main.ts', 'src/utils.ts', 'src/counter.ts'],
+      exclude: ['**/*.bench.ts', '**/*.d.ts', 'src/main.ts', 'src/counter.ts'],
       reporter: ['text', 'html'],
     },
   },

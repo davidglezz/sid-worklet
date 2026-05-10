@@ -1,6 +1,8 @@
 import type { LogEvent, PlayerErrorEvent } from './audio-player.ts';
 import { AudioPlayer } from './audio-player.ts';
 import { AudioVisualizer } from './audio-visualizer.ts';
+import { formatTime, parseDuration, parseSongLine } from './utils.ts';
+import type { Song } from './utils.ts';
 
 const appRoot = document.getElementById('app')!;
 const el = <T extends HTMLElement>(selector: string) => appRoot.querySelector<T>(selector)!;
@@ -178,13 +180,6 @@ async function play(songName: string) {
   await player.play();
 }
 
-interface Song {
-  relativeUrl: string;
-  path: string;
-  name: string;
-  durations: string[];
-}
-
 async function* streamSongList(): AsyncGenerator<Song> {
   const response = await fetch('songlist.txt');
   if (!response.ok || !response.body) {
@@ -270,36 +265,4 @@ async function* splitLines(stream: ReadableStream<string>) {
   if (pendingLine) {
     yield pendingLine;
   }
-}
-
-function parseSongLine(line: string) {
-  const [relativeUrl, ...durations] = line.trim().split('\t').filter(Boolean);
-  if (!relativeUrl) return null;
-
-  const pathSep = relativeUrl.lastIndexOf('/');
-  const fullName = pathSep >= 0 ? relativeUrl.slice(pathSep + 1) : relativeUrl;
-  const dotSep = fullName.lastIndexOf('.');
-
-  return {
-    relativeUrl,
-    path: pathSep >= 0 ? relativeUrl.slice(0, pathSep) : '',
-    name: dotSep >= 0 ? fullName.slice(0, dotSep) : fullName,
-    durations,
-  } satisfies Song;
-}
-
-function parseDuration(value: string | undefined) {
-  if (!value) return 0;
-  const [min, sec] = value.trim().split(':');
-  const minutes = Number(min);
-  const seconds = Number(sec);
-  if (!Number.isFinite(minutes) || !Number.isFinite(seconds)) return 0;
-  return Math.max(0, minutes * 60 + seconds);
-}
-
-function formatTime(value: number) {
-  const totalSeconds = Math.max(0, Math.floor(value));
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
