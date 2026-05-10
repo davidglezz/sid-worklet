@@ -48,8 +48,9 @@ export class AudioPlayer extends EventTarget {
     }
   }
 
-  async setVolume(value: number) {
+  setVolume(value: number): Promise<void> {
     this.gainNode.gain.value = value;
+    return Promise.resolve();
   }
 
   async play(url = '') {
