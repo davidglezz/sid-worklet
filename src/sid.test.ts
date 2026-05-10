@@ -131,6 +131,90 @@ describe('seek', () => {
   });
 });
 
+describe('seek — edge cases', () => {
+  const file = 'adsrtest';
+  const sampleRate = 44100;
+
+  it('seek to negative clamps to 0', ({ expect }) => {
+    const songBytes = toArrayBuffer(readFileSync(`test-songs/${file}.sid`));
+
+    // Reference: fresh load, collect 100 samples from position 0.
+    const ref = SIDPlayer(sampleRate);
+    ref.load(songBytes);
+    const expected: number[] = [];
+    for (let i = 0; i < 100; i++) expected.push(ref.play());
+
+    // seek(-5) must clamp to 0 and produce the same initial samples.
+    const sid = SIDPlayer(sampleRate);
+    sid.load(songBytes);
+    sid.seek(-5);
+    const actual: number[] = [];
+    for (let i = 0; i < 100; i++) actual.push(sid.play());
+
+    expect(actual).toEqual(expected);
+  });
+
+  it('seek beyond playtime advances forward', ({ expect }) => {
+    const songBytes = toArrayBuffer(readFileSync(`test-songs/${file}.sid`));
+    const sid = SIDPlayer(sampleRate);
+    sid.load(songBytes);
+
+    // Seek well past 0; the player must advance and not crash.
+    // Using 3 s (a large-but-practical value) rather than an impractical 9 999 s.
+    sid.seek(3);
+    expect(sid.playtime).toBeGreaterThan(0);
+  });
+
+  it('seek does not throw when called before load', ({ expect }) => {
+    const sid = SIDPlayer(sampleRate);
+    expect(() => sid.seek(1)).not.toThrow();
+    expect(sid.playtime).toBe(0);
+  });
+
+  it('consecutive seeks are always absolute', ({ expect }) => {
+    const songBytes = toArrayBuffer(readFileSync(`test-songs/${file}.sid`));
+    const verifyCount = 100;
+
+    // Reference: play straight through to 0.1 s, then capture samples.
+    const ref = SIDPlayer(sampleRate);
+    ref.load(songBytes);
+    const refSamples = Math.floor(0.1 * sampleRate);
+    for (let i = 0; i < refSamples; i++) ref.play();
+    const expected: number[] = [];
+    for (let i = 0; i < verifyCount; i++) expected.push(ref.play());
+
+    // Seeked player: jump forward to 0.3 s, then backward to 0.1 s.
+    // The second seek must be absolute (not relative to 0.3 s).
+    const sid = SIDPlayer(sampleRate);
+    sid.load(songBytes);
+    sid.seek(0.3);
+    sid.seek(0.1);
+    const actual: number[] = [];
+    for (let i = 0; i < verifyCount; i++) actual.push(sid.play());
+
+    expect(actual).toEqual(expected);
+  });
+
+  // This test plays 31 seconds of emulated audio to guarantee a checkpoint is
+  // written at the 30 s boundary, so give it a generous wall-clock budget.
+  it('checkpoint is used on forward seek past 30 s', ({ expect }) => {
+    const songBytes = toArrayBuffer(readFileSync(`test-songs/${file}.sid`));
+    const sid = SIDPlayer(sampleRate);
+    sid.load(songBytes);
+
+    // Advance past the first CHECKPOINT_INTERVAL (30 s) so the engine
+    // saves a checkpoint, then seek to 30.5 s to exercise the restore path.
+    const thirtyOneSamples = 31 * sampleRate;
+    for (let i = 0; i < thirtyOneSamples; i++) sid.play();
+
+    sid.seek(30.5);
+
+    // playtime must land within one sample of the requested target.
+    expect(sid.playtime).toBeGreaterThanOrEqual(30.5 - 1 / sampleRate);
+    expect(sid.playtime).toBeLessThan(30.5 + 1 / sampleRate);
+  }, 120_000); // up to 2 min — 31 s of emulated C64 audio takes real time
+});
+
 function toArrayBuffer(buffer: Buffer) {
   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
 }

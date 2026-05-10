@@ -5,6 +5,7 @@ export default defineConfig({
     singleQuote: true,
   },
   staged: {
+    '*.test.ts': 'vp fmt --write',
     '*': 'vp check --fix',
   },
   lint: { options: { typeAware: true, typeCheck: true } },
