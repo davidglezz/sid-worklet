@@ -8,9 +8,9 @@ const parts = {
   visualizer: el<HTMLCanvasElement>('#visualizer'),
   play: el<HTMLButtonElement>('#play'),
   position: el<HTMLInputElement>('#position'),
-  positionLabel: el<HTMLLabelElement>('[for=position]'),
+  time: el<HTMLLabelElement>('[for=position]'),
   subsong: el<HTMLSelectElement>('#subsong'),
-  time: el<HTMLSpanElement>('#time-indicator'),
+  title: el<HTMLSpanElement>('#title'),
   volume: el<HTMLInputElement>('#volume'),
   volumeLabel: el<HTMLLabelElement>('[for=volume]'),
   songlist: el<HTMLDivElement>('#songlist'),
@@ -37,7 +37,7 @@ player.on('statechange', (audioCtx) => {
   parts.play.classList.toggle('btn--playing', audioCtx.state === 'running');
 });
 player.on('songInfo', ({ songInfo }) => {
-  parts.positionLabel.textContent = songInfo.Name;
+  parts.title.textContent = songInfo.Name;
   setupSubsongSelector(songInfo.Subsongs);
   if (typeof songInfo.Subsong === 'number') {
     parts.subsong.value = String(songInfo.Subsong);
@@ -178,11 +178,9 @@ function getCurrentDuration() {
 }
 
 function updateTimeIndicator() {
-  const total = getCurrentDuration();
-  const currentPosition = Number(parts.position.value);
-  const clamped =
-    total > 0 ? Math.min(Math.max(currentPosition, 0), total) : Math.max(currentPosition, 0);
-  parts.time.textContent = `${formatTime(clamped)} / ${total > 0 ? formatTime(total) : '--:--'}`;
+  const total = Number(parts.position.max) | 0;
+  const currentPosition = Number(parts.position.value) | 0;
+  parts.time.textContent = `${formatTime(currentPosition)} / ${formatTime(total)}`;
 }
 
 async function* splitLines(stream: ReadableStream<string>) {
