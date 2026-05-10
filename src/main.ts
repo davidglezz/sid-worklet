@@ -1,4 +1,4 @@
-import type { LogEvent } from './audio-player.ts';
+import type { LogEvent, PlayerErrorEvent } from './audio-player.ts';
 import { AudioPlayer } from './audio-player.ts';
 import { AudioVisualizer } from './audio-visualizer.ts';
 
@@ -38,6 +38,7 @@ player.on('statechange', (audioCtx) => {
 });
 player.on('songInfo', ({ songInfo }) => {
   parts.title.textContent = songInfo.Name;
+  parts.title.classList.remove('title--error');
   setupSubsongSelector(songInfo.Subsongs);
   if (typeof songInfo.Subsong === 'number') {
     parts.subsong.value = String(songInfo.Subsong);
@@ -45,6 +46,10 @@ player.on('songInfo', ({ songInfo }) => {
   }
   updateTimeIndicator();
   console.log(songInfo); // eslint-disable-line no-console
+});
+player.on('error', ({ error }: PlayerErrorEvent) => {
+  parts.title.textContent = `⚠ ${error.message}`;
+  parts.title.classList.add('title--error');
 });
 parts.visualizer.onclick = async () => visualizer.next();
 parts.play.onclick = async () => player.togglePlay();

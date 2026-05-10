@@ -161,6 +161,11 @@ button {
   .position {
     overflow: hidden;
   }
+
+  #title.title--error {
+    color: #e05;
+    font-style: italic;
+  }
 }
 
 .list {

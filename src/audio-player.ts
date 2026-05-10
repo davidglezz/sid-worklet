@@ -8,6 +8,7 @@ export interface EventMap {
   position: PositionEvent;
   log: LogEvent;
   ready: CustomEvent;
+  error: PlayerErrorEvent;
 }
 
 export class AudioPlayer extends EventTarget {
@@ -84,9 +85,15 @@ export class AudioPlayer extends EventTarget {
   }
 
   async load(url: string) {
-    await this.readyPromise;
-    const songData = await this.download(url);
-    this.playerNode.load(songData);
+    try {
+      await this.readyPromise;
+      const songData = await this.download(url);
+      this.playerNode.load(songData);
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      this.dispatchEvent(new PlayerErrorEvent(error));
+      throw err;
+    }
   }
 
   /**
@@ -152,5 +159,14 @@ export class LogEvent extends Event {
     super('log');
     this.severity = severity;
     this.message = message;
+  }
+}
+
+export class PlayerErrorEvent extends Event {
+  readonly error: Error;
+
+  constructor(error: Error) {
+    super('error');
+    this.error = error;
   }
 }
