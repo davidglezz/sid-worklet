@@ -1,13 +1,23 @@
+// Flag operation table: each entry maps to a flag mask for CLC/SEC/CLI/SEI/CLV/CLD/SED instructions.
+// Bit 5 (0x20) set means SET the flag; clear means CLEAR the flag.
 const flagsw = [0x01, 0x21, 0x04, 0x24, 0x00, 0x40, 0x08, 0x28] as const;
 const branchflag = [0x80, 0x40, 0x01, 0x02];
 
 /**
- * CPU implementation is based on the instruction table by Graham at codebase64.
- * columns of the table (instructions' 2nd nybbles) mainly correspond to addressing modes,
+ * 6502/6510 CPU emulator used for C64 SID chip playback.
+ *
+ * Instruction dispatch is based on the instruction table by Graham at codebase64.
+ * Columns of the table (instructions' 2nd nybbles) mainly correspond to addressing modes,
  * and double-rows usually have the same instructions.
  *
- * @param memory
- * @returns Object with the CPU's public API
+ * STATUS register bit layout: `N V - B D I Z C`
+ *
+ * Limitations:
+ * - No BCD (Binary Coded Decimal) mode
+ * - CIA/VIC-IRQ, NMI, and RESET vectors are only partially emulated
+ *
+ * @param memory - The full 64 KB address space shared between CPU and SID hardware
+ * @returns Object with the CPU's public API (tick, init, getState, setState, etc.)
  */
 export function createCPU(memory: Uint8Array) {
   //CPU (and CIA/VIC-IRQ) emulation variables
@@ -39,47 +49,48 @@ export function createCPU(memory: Uint8Array) {
     cycles = 2; // ensure smallest 6510 runtime (for implied/register instructions)
     storadd = 0;
     //nybble2:  1/5/9/D:accu.instructions, 3/7/B/F:illegal opcodes
+    // Odd opcodes: ALU instructions (ORA/AND/EOR/ADC/SBC/CMP/LDA/STA)
     if (IR & 1) {
       //addressing modes (begin with more complex cases), PC wraparound not handled inside to save codespace
       switch (IR & 0x1f) {
-        case 1: //(zp,x)
+        case 1: // (zp,X) indexed indirect
         case 3:
           addr = memory[memory[++PC] + X] + memory[memory[PC] + X + 1] * 256;
           cycles = 6;
           break;
-        case 0x11: //(zp),y
+        case 0x11: // (zp),Y indirect indexed
         case 0x13:
           addr = memory[memory[++PC]] + memory[memory[PC] + 1] * 256 + Y;
           cycles = 6;
           break;
-        case 0x19: //abs,y
+        case 0x19: // abs,Y absolute indexed Y
         case 0x1f:
           addr = memory[++PC] + memory[++PC] * 256 + Y;
           cycles = 5;
           break;
-        case 0x1d: //abs,x
+        case 0x1d: // abs,X absolute indexed X
           addr = memory[++PC] + memory[++PC] * 256 + X;
           cycles = 5;
           break;
-        case 0xd: //abs
+        case 0xd: // abs absolute
         case 0xf:
           addr = memory[++PC] + memory[++PC] * 256;
           cycles = 4;
           break;
-        case 0x15: //zp,x
+        case 0x15: // zp,X zero page indexed X
           addr = memory[++PC] + X;
           cycles = 4;
           break;
-        case 5: //zp
+        case 5: // zp zero page
         case 7:
           addr = memory[++PC];
           cycles = 3;
           break;
-        case 0x17: //zp,y for LAX/SAX illegal opcodes
+        case 0x17: // zp,Y zero page indexed Y (LAX/SAX illegal opcodes)
           addr = memory[++PC] + Y;
           cycles = 4;
           break;
-        case 9: //immediate
+        case 9: // # immediate
         case 0xb:
           addr = ++PC;
           cycles = 2;
@@ -126,6 +137,7 @@ export function createCPU(memory: Uint8Array) {
           storadd = addr;
       }
     } else if (IR & 2) {
+      // Even+2 opcodes: shift/memory/register (ASL/ROL/LSR/ROR/LDX/STX/INC/DEC)
       //nybble2: 2:illegal/LDX, 6:A/X/INC/DEC, A:Accu-shift/reg.transfer/NOP, E:shift/X/INC/DEC
       switch (
         IR & 0x1f //addressing modes
@@ -224,6 +236,7 @@ export function createCPU(memory: Uint8Array) {
           }
       }
     } else if ((IR & 0xc) === 8) {
+      // nybble2=8: stack and status register operations
       //nybble2:  8:register/status
       switch (IR & 0xf0) {
         case 0x60:
@@ -282,6 +295,7 @@ export function createCPU(memory: Uint8Array) {
         //CLC/SEC/CLI/SEI/CLV/CLD/SED
       }
     } else {
+      // nybble2=0/4/C: control flow, branches, Y register, JMP/JSR/RTS/RTI
       //nybble2:  0: control/branch/Y/compare  4: Y/compare  C:Y/compare/JMP
       if ((IR & 0x1f) === 0x10) {
         PC++;
@@ -397,10 +411,18 @@ export function createCPU(memory: Uint8Array) {
     //memory[addr]&=0xFF;
   }
 
+  /**
+   * Returns a snapshot of all CPU registers and internal state.
+   * Used as seek checkpoints to allow fast forward-seeking without re-running the CPU from the start.
+   */
   function getState() {
     return { PC, A, T, X, Y, IR, SP, ST, addr, cycles, storadd };
   }
 
+  /**
+   * Restores all CPU registers and internal state from a previously saved snapshot.
+   * Used to restore a seek checkpoint.
+   */
   function setState(state: ReturnType<typeof getState>) {
     PC = state.PC;
     A = state.A;
@@ -415,8 +437,19 @@ export function createCPU(memory: Uint8Array) {
     storadd = state.storadd;
   }
 
+  /**
+   * Workaround for songs that write to mirrored SID addresses in the $D420–$D7FF range
+   * (e.g. "CJ in the USA" by Galway/Rubicon). On real C64 hardware, accesses to $D420–$D7FF
+   * partially mirror the primary SID register range at $D400–$D41F. This function replicates
+   * those writes to the canonical SID registers so that the emulator produces the correct sound.
+   *
+   * Writes that fall within the SID2 or SID3 base address ranges are excluded, as those are
+   * intentional multi-SID register accesses and must not be mirrored.
+   *
+   * @param SID_address1 - Base address of SID2 (0 if not used)
+   * @param SID_address2 - Base address of SID3 (0 if not used)
+   */
   function galwayRubiconWorkaround(SID_address1: number, SID_address2: number) {
-    //CJ in the USA workaround (writing above $d420, except SID2/SID3)
     if (storadd >= 0xd420 && storadd < 0xd800 && memory[1] & 3) {
       if (
         !(SID_address1 <= storadd && storadd < SID_address1 + 0x1f) &&
