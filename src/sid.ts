@@ -45,6 +45,24 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
   const CPU = createCPU(memory);
   const SID = createSID(memory, samplerate, clk_ratio, SID_model);
 
+  const CHECKPOINT_INTERVAL = 30; // seconds
+
+  interface Checkpoint {
+    playtime: number;
+    cpu: ReturnType<typeof CPU.getState>;
+    sid: ReturnType<typeof SID.getState>;
+    memory: Uint8Array;
+    CPUtime: number;
+    framecnt: number;
+    frame_sampleperiod: number;
+    finished: number;
+    ended: number;
+    playaddr: number;
+    subtune: number;
+  }
+
+  let checkpoints: Checkpoint[] = [];
+
   function unload() {
     loaded = 0;
     SID.init();
@@ -131,6 +149,7 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
       CPUtime = 0;
       playtime = 0;
       ended = 0;
+      checkpoints = [];
       initialized = 1;
     }
   }
@@ -179,6 +198,23 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
     if (SID_address[1]) mix += SID.emulate(1, SID_address[1]);
     if (SID_address[2]) mix += SID.emulate(2, SID_address[2]);
 
+    // Save a checkpoint at each CHECKPOINT_INTERVAL boundary.
+    if (Math.floor(playtime / CHECKPOINT_INTERVAL) > checkpoints.length - 1) {
+      checkpoints.push({
+        playtime,
+        cpu: CPU.getState(),
+        sid: SID.getState(),
+        memory: new Uint8Array(memory),
+        CPUtime,
+        framecnt,
+        frame_sampleperiod,
+        finished,
+        ended,
+        playaddr,
+        subtune,
+      });
+    }
+
     return mix * volume * SIDamount_vol[SIDamount];
   }
 
@@ -186,14 +222,33 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
     if (!loaded) return;
     const targetSeconds = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
 
-    // Absolute seek: if rewinding, reset the emulator; if forwarding, advance from current playtime.
-    if (targetSeconds < playtime) {
+    // Find the latest checkpoint at or before the target time.
+    const cpIndex = checkpoints.findLastIndex((cp) => cp.playtime <= targetSeconds);
+
+    let startSamples: number;
+    if (cpIndex >= 0) {
+      // Restore checkpoint state without calling init().
+      const cp = checkpoints[cpIndex]!;
+      memory.set(cp.memory);
+      CPU.setState(cp.cpu);
+      SID.setState(cp.sid);
+      playtime = cp.playtime;
+      CPUtime = cp.CPUtime;
+      framecnt = cp.framecnt;
+      frame_sampleperiod = cp.frame_sampleperiod;
+      finished = cp.finished;
+      ended = cp.ended;
+      playaddr = cp.playaddr;
+      subtune = cp.subtune;
+      startSamples = Math.floor(cp.playtime * samplerate);
+    } else {
+      // No usable checkpoint: restart from the beginning.
       init(subtune);
+      startSamples = 0;
     }
 
-    const currentSamples = Math.floor(playtime * samplerate);
     const targetSamples = Math.floor(targetSeconds * samplerate);
-    for (let i = currentSamples; i < targetSamples; i++) {
+    for (let i = startSamples; i < targetSamples; i++) {
       play();
     }
   }

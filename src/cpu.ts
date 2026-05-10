@@ -397,6 +397,24 @@ export function createCPU(memory: Uint8Array) {
     //memory[addr]&=0xFF;
   }
 
+  function getState() {
+    return { PC, A, T, X, Y, IR, SP, ST, addr, cycles, storadd };
+  }
+
+  function setState(state: ReturnType<typeof getState>) {
+    PC = state.PC;
+    A = state.A;
+    T = state.T;
+    X = state.X;
+    Y = state.Y;
+    IR = state.IR;
+    SP = state.SP;
+    ST = state.ST;
+    addr = state.addr;
+    cycles = state.cycles;
+    storadd = state.storadd;
+  }
+
   function galwayRubiconWorkaround(SID_address1: number, SID_address2: number) {
     //CJ in the USA workaround (writing above $d420, except SID2/SID3)
     if (storadd >= 0xd420 && storadd < 0xd800 && memory[1] & 3) {
@@ -411,6 +429,8 @@ export function createCPU(memory: Uint8Array) {
   return {
     tick,
     init,
+    getState,
+    setState,
     get cycles() {
       return cycles;
     },

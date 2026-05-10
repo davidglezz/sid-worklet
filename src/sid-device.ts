@@ -378,6 +378,52 @@ export function createSID(
     return combiwf;
   }
 
+  function getState() {
+    return {
+      ADSRstate: [...ADSRstate],
+      ratecnt: [...ratecnt],
+      envcnt: [...envcnt],
+      expcnt: [...expcnt],
+      prevSR: [...prevSR],
+      phaseaccu: [...phaseaccu],
+      prevaccu: [...prevaccu],
+      sourceMSBrise: [...sourceMSBrise],
+      sourceMSB: [...sourceMSB],
+      noise_LFSR: [...noise_LFSR],
+      prevwfout: [...prevwfout],
+      prevwavdata: [...prevwavdata],
+      prevlowpass: [...prevlowpass],
+      prevbandpass: [...prevbandpass],
+      wfout,
+      cutoff,
+      resonance,
+      filtin,
+      output,
+    };
+  }
+
+  function setState(state: ReturnType<typeof getState>) {
+    for (let i = 0; i < ADSRstate.length; i++) ADSRstate[i] = state.ADSRstate[i]!;
+    for (let i = 0; i < ratecnt.length; i++) ratecnt[i] = state.ratecnt[i]!;
+    for (let i = 0; i < envcnt.length; i++) envcnt[i] = state.envcnt[i]!;
+    for (let i = 0; i < expcnt.length; i++) expcnt[i] = state.expcnt[i]!;
+    for (let i = 0; i < prevSR.length; i++) prevSR[i] = state.prevSR[i]!;
+    for (let i = 0; i < phaseaccu.length; i++) phaseaccu[i] = state.phaseaccu[i]!;
+    for (let i = 0; i < prevaccu.length; i++) prevaccu[i] = state.prevaccu[i]!;
+    for (let i = 0; i < sourceMSBrise.length; i++) sourceMSBrise[i] = state.sourceMSBrise[i]!;
+    for (let i = 0; i < sourceMSB.length; i++) sourceMSB[i] = state.sourceMSB[i]!;
+    for (let i = 0; i < noise_LFSR.length; i++) noise_LFSR[i] = state.noise_LFSR[i]!;
+    for (let i = 0; i < prevwfout.length; i++) prevwfout[i] = state.prevwfout[i]!;
+    for (let i = 0; i < prevwavdata.length; i++) prevwavdata[i] = state.prevwavdata[i]!;
+    for (let i = 0; i < prevlowpass.length; i++) prevlowpass[i] = state.prevlowpass[i]!;
+    for (let i = 0; i < prevbandpass.length; i++) prevbandpass[i] = state.prevbandpass[i]!;
+    wfout = state.wfout;
+    cutoff = state.cutoff;
+    resonance = state.resonance;
+    filtin = state.filtin;
+    output = state.output;
+  }
+
   //volume range: 0..1
   function getOutput() {
     return (output / OUTPUT_SCALEDOWN) * (memory[0xd418] & 0xf);
@@ -389,5 +435,12 @@ export function createSID(
     if (addr === 0xd412 && !(memory[0xd412] & 1)) ADSRstate[2] &= 0x3e;
   }
 
-  return { init, emulate, whittakerPlayerWorkaround, getOutput };
+  return {
+    init,
+    emulate,
+    whittakerPlayerWorkaround,
+    getOutput,
+    getState,
+    setState,
+  };
 }
