@@ -55,9 +55,74 @@ parts.visualizer.onclick = async () => visualizer.next();
 parts.play.onclick = async () => player.togglePlay();
 parts.volume.oninput = (event) => {
   const value = (event.target as HTMLInputElement).value;
-  void player.setVolume(Number(value));
-  parts.volumeLabel.textContent = `${Math.round(Number(value) * 100)}%`;
+  applyVolume(Number(value));
 };
+
+/** Clamps volume to [0,1], updates the slider, label and player gain. */
+function applyVolume(value: number) {
+  const clamped = Math.max(0, Math.min(1, value));
+  parts.volume.value = String(clamped);
+  void player.setVolume(clamped);
+  parts.volumeLabel.textContent = `${Math.round(clamped * 100)}%`;
+}
+
+/** Volume level remembered before muting, restored on un-mute. */
+let volumeBeforeMute = 1;
+
+/** Returns true when the event target is an editable control. */
+function isEditableTarget(e: KeyboardEvent) {
+  const tag = (e.target as HTMLElement).tagName;
+  return tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA';
+}
+
+window.addEventListener('keydown', (e) => {
+  if (isEditableTarget(e)) return;
+  switch (e.key) {
+    case ' ':
+      e.preventDefault();
+      void player.togglePlay();
+      break;
+    case 'ArrowLeft': {
+      e.preventDefault();
+      const pos = Math.max(0, Number(parts.position.value) - 5);
+      parts.position.value = String(pos);
+      updateTimeIndicator();
+      player.setPosition(pos);
+      break;
+    }
+    case 'ArrowRight': {
+      e.preventDefault();
+      const max = Number(parts.position.max);
+      const pos =
+        max > 0
+          ? Math.min(max, Number(parts.position.value) + 5)
+          : Number(parts.position.value) + 5;
+      parts.position.value = String(pos);
+      updateTimeIndicator();
+      player.setPosition(pos);
+      break;
+    }
+    case 'ArrowUp':
+      e.preventDefault();
+      applyVolume(Number(parts.volume.value) + 0.1);
+      break;
+    case 'ArrowDown':
+      e.preventDefault();
+      applyVolume(Number(parts.volume.value) - 0.1);
+      break;
+    case 'm':
+    case 'M': {
+      const current = Number(parts.volume.value);
+      if (current > 0) {
+        volumeBeforeMute = current;
+        applyVolume(0);
+      } else {
+        applyVolume(volumeBeforeMute);
+      }
+      break;
+    }
+  }
+});
 parts.subsong.onchange = () => {
   const value = Number(parts.subsong.value);
   parts.position.value = '0';
