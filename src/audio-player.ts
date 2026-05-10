@@ -1,4 +1,5 @@
 import { SIDNode } from './sid-node.ts';
+import type { SongInfo } from './sid-worklet.ts';
 import SIDProcessor from './sid-worklet.ts?worker&url';
 
 export interface EventMap {
@@ -125,9 +126,9 @@ export class PositionEvent extends Event {
 }
 
 export class SongInfoEvent extends Event {
-  readonly songInfo: any;
+  readonly songInfo: SongInfo;
 
-  constructor(songInfo: any) {
+  constructor(songInfo: SongInfo) {
     super('songInfo');
     this.songInfo = songInfo;
   }

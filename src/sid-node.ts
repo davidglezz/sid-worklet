@@ -1,7 +1,7 @@
-import type { InputMessages, OutputMessages } from './sid-worklet';
+import type { InputMessages, OutputMessages, SongInfo } from './sid-worklet';
 
 interface EventMap {
-  songInfo: CustomEvent<{ songInfo: any }>;
+  songInfo: CustomEvent<{ songInfo: SongInfo }>;
   position: CustomEvent<{ value: number }>;
   log: CustomEvent<{ severity: 'info' | 'warn' | 'error'; message: string }>;
 }

@@ -9,6 +9,20 @@ import { SIDPlayer } from './sid.ts';
   }
 };
 
+/** Metadata for a loaded SID file. */
+export interface SongInfo {
+  /** Author and title formatted as "Author - Title". */
+  Name: string;
+  /** Copyright / info string from the SID header. */
+  Info: string;
+  /** Song duration in seconds (0 when unknown). */
+  Duration: number;
+  /** Zero-based index of the currently active subsong. */
+  Subsong: number;
+  /** Total number of subsongs in this file. */
+  Subsongs: number;
+}
+
 /** Types to define the comunication between the AudioWorklet and the Node. */
 export interface InputMessagesMap {
   load: { songData: ArrayBuffer };
@@ -17,7 +31,7 @@ export interface InputMessagesMap {
 }
 
 export interface OutputMessagesMap {
-  songInfo: { songInfo: any };
+  songInfo: { songInfo: SongInfo };
   position: { value: number };
   log: { severity: 'info' | 'warn' | 'error'; message: string };
 }
@@ -28,7 +42,9 @@ type Id<T extends object, R = { [ID in keyof T]: { id: ID } & T[ID] }[keyof T]> 
 export type InputMessages = Id<InputMessagesMap>;
 export type OutputMessages = Id<OutputMessagesMap>;
 
-type MessageHandler<T = InputMessagesMap> = { [ID in keyof T]: (params: T[ID]) => void };
+type MessageHandler<T = InputMessagesMap> = {
+  [ID in keyof T]: (params: T[ID]) => void;
+};
 
 class SIDProcessor
   extends AudioWorkletProcessor
@@ -97,7 +113,7 @@ class SIDProcessor
     this.port.postMessage({ id: 'position', value: 0 });
   }
 
-  getSongInfo() {
+  getSongInfo(): SongInfo {
     return {
       Name: `${this.sid.author} - ${this.sid.title}`,
       Info: this.sid.info,
