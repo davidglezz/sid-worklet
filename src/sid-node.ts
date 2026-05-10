@@ -48,4 +48,8 @@ export class SIDNode extends AudioWorkletNode {
   setSubsong(value: number) {
     this.sendMessage({ id: 'setSubsong', value });
   }
+
+  setDuration(seconds: number) {
+    this.sendMessage({ id: 'setDuration', value: seconds });
+  }
 }

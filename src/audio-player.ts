@@ -62,9 +62,9 @@ export class AudioPlayer extends EventTarget {
     return Promise.resolve();
   }
 
-  async play(url = '') {
+  async play(url = '', durationSeconds = 0) {
     if (url) {
-      await this.load(url);
+      await this.load(url, durationSeconds);
     }
 
     if (this.context.state !== 'running') {
@@ -84,10 +84,11 @@ export class AudioPlayer extends EventTarget {
     }
   }
 
-  async load(url: string) {
+  async load(url: string, durationSeconds = 0) {
     try {
       await this.readyPromise;
       const songData = await this.download(url);
+      this.playerNode.setDuration(durationSeconds);
       this.playerNode.load(songData);
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));

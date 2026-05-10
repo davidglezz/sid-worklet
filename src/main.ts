@@ -172,7 +172,7 @@ async function load(songName: string) {
   parts.position.value = '0';
   parts.position.max = `${getCurrentDuration()}`;
   updateTimeIndicator();
-  await player.load(`https://modland.com/pub/modules/HVSC${songName}`);
+  await player.load(`https://modland.com/pub/modules/HVSC${songName}`, getCurrentDuration());
 }
 
 async function play(songName: string) {

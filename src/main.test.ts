@@ -12,6 +12,7 @@ vi.mock('./sid-node.ts', () => ({
     load() {}
     setPosition() {}
     setSubsong() {}
+    setDuration() {}
     addEventListener() {}
     removeEventListener() {}
   },

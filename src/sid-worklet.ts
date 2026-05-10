@@ -32,6 +32,7 @@ export interface InputMessagesMap {
   load: { songData: ArrayBuffer };
   setPosition: { value: number };
   setSubsong: { value: number };
+  setDuration: { value: number };
 }
 
 export interface OutputMessagesMap {
@@ -57,6 +58,8 @@ class SIDProcessor
   sid = SIDPlayer(/*sampleRate*/);
   /** Pending seek target in seconds; null if no seek is queued (last-wins). */
   private pendingSeek: number | null = null;
+  /** Duration of the current song in seconds (0 when unknown). */
+  private duration = 0;
   /** Sample counter used to throttle periodic position messages. */
   private samplesSinceLastPosition = 0;
   /** Emit a position message every ~100 ms (at 44100 Hz ≈ 4410 samples). */
@@ -117,11 +120,15 @@ class SIDProcessor
     this.port.postMessage({ id: 'position', value: 0 });
   }
 
+  setDuration({ value }: InputMessagesMap['setDuration']) {
+    this.duration = value;
+  }
+
   getSongInfo(): SongInfo {
     return {
       Name: `${this.sid.author} - ${this.sid.title}`,
       Info: this.sid.info,
-      Duration: 0,
+      Duration: this.duration,
       Subsong: this.sid.subtune,
       Subsongs: this.sid.subtunes,
     };
