@@ -24,8 +24,13 @@ export class SIDNode extends AudioWorkletNode {
     };
   }
 
-  on<K extends keyof EventMap>(id: K, callback: (event: EventMap[K]) => void) {
+  /**
+   * Subscribe to a worklet event.
+   * @returns A function that removes the listener when called.
+   */
+  on<K extends keyof EventMap>(id: K, callback: (event: EventMap[K]) => void): () => void {
     this.addEventListener(id, callback as EventListener);
+    return () => this.removeEventListener(id, callback as EventListener);
   }
 
   protected sendMessage(message: InputMessages) {
