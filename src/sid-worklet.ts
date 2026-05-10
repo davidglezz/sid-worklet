@@ -2,10 +2,14 @@ import { SIDPlayer } from './sid.ts';
 
 /// <reference types="@types/audioworklet" />
 
-// This is a workaround to make the TextDecoder available in the AudioWorkletGlobalScope
-(globalThis as any).TextDecoder = class TextDecoder {
-  decode(buffer: Uint8Array) {
-    return String.fromCharCode(...buffer);
+// Polyfill TextDecoder for AudioWorkletGlobalScope (only when not already present).
+(globalThis as any).TextDecoder ??= class TextDecoder {
+  decode(buffer: Uint8Array): string {
+    let result = '';
+    for (let i = 0; i < buffer.length; i++) {
+      result += String.fromCharCode(buffer[i]);
+    }
+    return result;
   }
 };
 
