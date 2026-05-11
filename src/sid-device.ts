@@ -72,30 +72,59 @@ export function createSID(
 
   //SID emulation constants
   const FILTSW = [1, 2, 4, 1, 2, 4, 1, 2, 4] as const;
+  const channelStateLength = SID_CHANNEL_AMOUNT * 3;
+  const sidStateLength = 3;
   //SID emulation variables
-  const ADSRstate = [0, 0, 0, 0, 0, 0, 0, 0, 0];
-  const ratecnt = [0, 0, 0, 0, 0, 0, 0, 0, 0];
-  const envcnt = [0, 0, 0, 0, 0, 0, 0, 0, 0];
-  const expcnt = [0, 0, 0, 0, 0, 0, 0, 0, 0];
-  const prevSR = [0, 0, 0, 0, 0, 0, 0, 0, 0];
-  const phaseaccu = [0, 0, 0, 0, 0, 0, 0, 0, 0];
-  const prevaccu = [0, 0, 0, 0, 0, 0, 0, 0, 0];
-  const sourceMSBrise = [0, 0, 0];
-  const sourceMSB = [0, 0, 0];
-  const noise_LFSR = [
-    0x7ffff8, 0x7ffff8, 0x7ffff8, 0x7ffff8, 0x7ffff8, 0x7ffff8, 0x7ffff8, 0x7ffff8, 0x7ffff8,
-  ];
-  const prevwfout = [0, 0, 0, 0, 0, 0, 0, 0, 0];
-  const prevwavdata = [0, 0, 0, 0, 0, 0, 0, 0, 0];
-  const prevlowpass = [0, 0, 0];
-  const prevbandpass = [0, 0, 0];
+  let stateByteOffset = 0;
+  function reserveState(length: number, bytesPerElement: number) {
+    stateByteOffset = Math.ceil(stateByteOffset / bytesPerElement) * bytesPerElement;
+    const byteOffset = stateByteOffset;
+    stateByteOffset += length * bytesPerElement;
+    return byteOffset;
+  }
+  const ADSRstateOffset = reserveState(channelStateLength, Uint8Array.BYTES_PER_ELEMENT);
+  const ratecntOffset = reserveState(channelStateLength, Float64Array.BYTES_PER_ELEMENT);
+  const envcntOffset = reserveState(channelStateLength, Int16Array.BYTES_PER_ELEMENT);
+  const expcntOffset = reserveState(channelStateLength, Uint8Array.BYTES_PER_ELEMENT);
+  const prevSROffset = reserveState(channelStateLength, Uint8Array.BYTES_PER_ELEMENT);
+  const phaseaccuOffset = reserveState(channelStateLength, Float64Array.BYTES_PER_ELEMENT);
+  const prevaccuOffset = reserveState(channelStateLength, Float64Array.BYTES_PER_ELEMENT);
+  const sourceMSBriseOffset = reserveState(sidStateLength, Uint8Array.BYTES_PER_ELEMENT);
+  const sourceMSBOffset = reserveState(sidStateLength, Uint32Array.BYTES_PER_ELEMENT);
+  const noiseLFSROffset = reserveState(channelStateLength, Uint32Array.BYTES_PER_ELEMENT);
+  const prevwfoutOffset = reserveState(channelStateLength, Float64Array.BYTES_PER_ELEMENT);
+  const prevwavdataOffset = reserveState(channelStateLength, Uint16Array.BYTES_PER_ELEMENT);
+  const prevlowpassOffset = reserveState(sidStateLength, Float64Array.BYTES_PER_ELEMENT);
+  const prevbandpassOffset = reserveState(sidStateLength, Float64Array.BYTES_PER_ELEMENT);
+  const wfoutOffset = reserveState(1, Float64Array.BYTES_PER_ELEMENT);
+  const cutoffOffset = reserveState(1, Float64Array.BYTES_PER_ELEMENT);
+  const resonanceOffset = reserveState(1, Float64Array.BYTES_PER_ELEMENT);
+  const filtinOffset = reserveState(1, Float64Array.BYTES_PER_ELEMENT);
+  const outputOffset = reserveState(1, Float64Array.BYTES_PER_ELEMENT);
+  const stateBuffer = new ArrayBuffer(stateByteOffset);
+  const stateBytes = new Uint8Array(stateBuffer);
+  const ADSRstate = new Uint8Array(stateBuffer, ADSRstateOffset, channelStateLength);
+  const ratecnt = new Float64Array(stateBuffer, ratecntOffset, channelStateLength);
+  const envcnt = new Int16Array(stateBuffer, envcntOffset, channelStateLength);
+  const expcnt = new Uint8Array(stateBuffer, expcntOffset, channelStateLength);
+  const prevSR = new Uint8Array(stateBuffer, prevSROffset, channelStateLength);
+  const phaseaccu = new Float64Array(stateBuffer, phaseaccuOffset, channelStateLength);
+  const prevaccu = new Float64Array(stateBuffer, prevaccuOffset, channelStateLength);
+  const sourceMSBrise = new Uint8Array(stateBuffer, sourceMSBriseOffset, sidStateLength);
+  const sourceMSB = new Uint32Array(stateBuffer, sourceMSBOffset, sidStateLength);
+  const noise_LFSR = new Uint32Array(stateBuffer, noiseLFSROffset, channelStateLength);
+  const prevwfout = new Float64Array(stateBuffer, prevwfoutOffset, channelStateLength);
+  const prevwavdata = new Uint16Array(stateBuffer, prevwavdataOffset, channelStateLength);
+  const prevlowpass = new Float64Array(stateBuffer, prevlowpassOffset, sidStateLength);
+  const prevbandpass = new Float64Array(stateBuffer, prevbandpassOffset, sidStateLength);
+  const wfout = new Float64Array(stateBuffer, wfoutOffset, 1);
+  const cutoff = new Float64Array(stateBuffer, cutoffOffset, 1);
+  const resonance = new Float64Array(stateBuffer, resonanceOffset, 1);
+  const filtin = new Float64Array(stateBuffer, filtinOffset, 1);
+  const output = new Float64Array(stateBuffer, outputOffset, 1);
+  noise_LFSR.fill(0x7ffff8);
   const cutoff_ratio_8580 = (-2 * 3.14 * (12500 / 256)) / samplerate;
   const cutoff_ratio_6581 = (-2 * 3.14 * (20000 / 256)) / samplerate;
-  let wfout: number;
-  let cutoff: number;
-  let resonance: number;
-  let filtin: number;
-  let output: number;
 
   function init() {
     for (let i = 0xd400; i <= 0xd7ff; i++) memory[i] = 0;
@@ -108,8 +137,8 @@ export function createSID(
 
   function emulate(num: number, SIDaddr: number) {
     //the SID emulation itself ('num' is the number of SID to iterate (0..2)
-    filtin = 0;
-    output = 0;
+    filtin[0] = 0;
+    output[0] = 0;
 
     //treating 2SID and 3SID channels uniformly (0..5 / 0..8), this probably avoids some extra code
     for (
@@ -214,7 +243,7 @@ export function createSID(
           noise_LFSR[channel] = noiseLFSR;
         }
         //we simply zero output when other waveform is mixed with noise. On real SID LFSR continuously gets filled by zero and locks up. ($C1 waveform with pw<8 can keep it for a while...)
-        wfout =
+        wfout[0] =
           wf & 0x70
             ? 0
             : ((noiseLFSR & 0x100000) >> 5) +
@@ -247,34 +276,34 @@ export function createSID(
           //elongated making it a bit trapezoid. But not in time-domain, but altering the transfer-characteristics. This had to be done
           //in a frequency-dependent way, proportionally to pitch, to keep the deep sounds crisp. The following code does this (my favourite testcase is Robocop3 intro):
           if (test) {
-            wfout = 0xffff;
+            wfout[0] = 0xffff;
           } else if (phase < pw) {
             //rising edge
             let limit = (0xffff - pw) * step;
             if (limit > 0xffff) limit = 0xffff;
-            wfout = limit - (pw - phase) * step;
-            if (wfout < 0) wfout = 0;
+            wfout[0] = limit - (pw - phase) * step;
+            if (wfout[0] < 0) wfout[0] = 0;
           } else {
             //falling edge
             let limit = pw * step;
             if (limit > 0xffff) limit = 0xffff;
-            wfout = (0xffff - phase) * step - limit;
-            if (wfout >= 0) wfout = 0xffff;
-            wfout &= 0xffff;
+            wfout[0] = (0xffff - phase) * step - limit;
+            if (wfout[0] >= 0) wfout[0] = 0xffff;
+            wfout[0] &= 0xffff;
           }
         } else if (phase >= pw || test) {
           //combined pulse
           //(this would be enough for simple but aliased-at-high-pitches pulse)
-          wfout = 0xffff;
+          wfout[0] = 0xffff;
 
           // pulse+triangle
           if (wf & Bitmask.TRI) {
             // pulse+triangle+saw (waveform nearly identical to tri+saw)
             if (wf & Bitmask.SAW) {
-              wfout = combinedWaveForm(num, channel, PulseTriSaw_8580, phase >> 4, 1);
+              wfout[0] = combinedWaveForm(num, channel, PulseTriSaw_8580, phase >> 4, 1);
             } else {
               const value = phaseaccu[channel] ^ (ctrl & Bitmask.RING ? sourceMSB[num] : 0);
-              wfout = combinedWaveForm(
+              wfout[0] = combinedWaveForm(
                 num,
                 channel,
                 PulseSaw_8580,
@@ -284,14 +313,14 @@ export function createSID(
             }
           } else if (wf & Bitmask.SAW) {
             //pulse+saw
-            wfout = combinedWaveForm(num, channel, PulseSaw_8580, phase >> 4, 1);
+            wfout[0] = combinedWaveForm(num, channel, PulseSaw_8580, phase >> 4, 1);
           }
         } else {
-          wfout = 0;
+          wfout[0] = 0;
         }
       } else if (wf & Bitmask.SAW) {
         //saw
-        wfout = phaseaccu[channel] >> 8;
+        wfout[0] = phaseaccu[channel] >> 8;
         //saw (this row would be enough for simple but aliased-at-high-pitch saw)
         //The anti-aliasing (cleaning) of high-pitched sawtooth wave works by the same principle as mentioned above for the pulse,
         //but the sawtooth has even harsher edge/transition, and as the falling edge gets longer, tha rising edge should became shorter,
@@ -301,22 +330,22 @@ export function createSID(
         //But for deep sounds the sawtooth is really close to a sawtooth, as there is no aliasing there, but deep sounds should be sharp...
         if (wf & Bitmask.TRI) {
           //saw+triangle
-          wfout = combinedWaveForm(num, channel, TriSaw_8580, wfout >> 4, 1);
+          wfout[0] = combinedWaveForm(num, channel, TriSaw_8580, wfout[0] >> 4, 1);
         } else {
           //simple cleaned (bandlimited) saw
           const step = accuadd / 0x1200000;
-          wfout += wfout * step;
-          if (wfout > 0xffff) {
-            wfout = 0xffff - (wfout - 0x10000) / step;
+          wfout[0] += wfout[0] * step;
+          if (wfout[0] > 0xffff) {
+            wfout[0] = 0xffff - (wfout[0] - 0x10000) / step;
           }
         }
       } else if (wf & Bitmask.TRI) {
         //triangle (this waveform has no harsh edges, so it doesn't suffer from strong aliasing at high pitches)
         const value = phaseaccu[channel] ^ (ctrl & Bitmask.RING ? sourceMSB[num] : 0);
-        wfout = (value ^ (value & 0x800000 ? 0xffffff : 0)) >> 7;
+        wfout[0] = (value ^ (value & 0x800000 ? 0xffffff : 0)) >> 7;
       }
 
-      prevwfout[channel] = wfout = wf ? wfout : prevwfout[channel];
+      prevwfout[channel] = wfout[0] = wf ? wfout[0] : prevwfout[channel];
 
       //emulate waveform 00 floating wave-DAC (on real SID waveform00 decays after 15s..50s depending on temperature?)
       prevaccu[channel] = phaseaccu[channel];
@@ -325,42 +354,42 @@ export function createSID(
 
       //routing the channel signal to either the filter or the unfiltered master output depending on filter-switch SID-registers
       if (memory[SIDaddr + 0x17] & FILTSW[channel]) {
-        filtin += (wfout - 0x8000) * (envcnt[channel] / 256);
+        filtin[0] += (wfout[0] - 0x8000) * (envcnt[channel] / 256);
       } else if (channel % SID_CHANNEL_AMOUNT !== 2 || !(memory[SIDaddr + 0x18] & Bitmask.OFF3)) {
-        output += (wfout - 0x8000) * (envcnt[channel] / 256);
+        output[0] += (wfout[0] - 0x8000) * (envcnt[channel] / 256);
       }
     }
 
     //update readable SID-registers (some SID tunes might use 3rd channel ENV3/OSC3 value as control)
-    if (memory[1] & 3) memory[SIDaddr + 0x1b] = wfout >> 8;
+    if (memory[1] & 3) memory[SIDaddr + 0x1b] = wfout[0] >> 8;
     memory[SIDaddr + 0x1c] = envcnt[3];
     //OSC3, ENV3 (some players rely on it)
 
     //FILTER: two integrator loop bi-quadratic filter, workings learned from resid code, but I kindof simplified the equations
     //The phases of lowpass and highpass outputs are inverted compared to the input, but bandpass IS in phase with the input signal.
     //The 8580 cutoff frequency control-curve is ideal, while the 6581 has a treshold, and below it it outputs a constant lowpass frequency.
-    cutoff = (memory[SIDaddr + 0x15] & 7) / 8 + memory[SIDaddr + 0x16] + 0.2;
+    cutoff[0] = (memory[SIDaddr + 0x15] & 7) / 8 + memory[SIDaddr + 0x16] + 0.2;
     if (SID_model[num] === 8580) {
-      cutoff = 1 - Math.exp(cutoff * cutoff_ratio_8580);
-      resonance = 2 ** ((4 - (memory[SIDaddr + 0x17] >> 4)) / 8);
+      cutoff[0] = 1 - Math.exp(cutoff[0] * cutoff_ratio_8580);
+      resonance[0] = 2 ** ((4 - (memory[SIDaddr + 0x17] >> 4)) / 8);
     } else {
-      cutoff = cutoff < 24 ? 0.035 : 1 - 1.263 * Math.exp(cutoff * cutoff_ratio_6581);
-      resonance = memory[SIDaddr + 0x17] > 0x5f ? 8 / (memory[SIDaddr + 0x17] >> 4) : 1.41;
+      cutoff[0] = cutoff[0] < 24 ? 0.035 : 1 - 1.263 * Math.exp(cutoff[0] * cutoff_ratio_6581);
+      resonance[0] = memory[SIDaddr + 0x17] > 0x5f ? 8 / (memory[SIDaddr + 0x17] >> 4) : 1.41;
     }
-    let filterValue = filtin + prevbandpass[num] * resonance + prevlowpass[num];
-    if (memory[SIDaddr + 0x18] & Bitmask.HIGHPASS) output -= filterValue;
-    filterValue = prevbandpass[num] - filterValue * cutoff;
+    let filterValue = filtin[0] + prevbandpass[num] * resonance[0] + prevlowpass[num];
+    if (memory[SIDaddr + 0x18] & Bitmask.HIGHPASS) output[0] -= filterValue;
+    filterValue = prevbandpass[num] - filterValue * cutoff[0];
     prevbandpass[num] = filterValue;
-    if (memory[SIDaddr + 0x18] & Bitmask.BANDPASS) output -= filterValue;
-    filterValue = prevlowpass[num] + filterValue * cutoff;
+    if (memory[SIDaddr + 0x18] & Bitmask.BANDPASS) output[0] -= filterValue;
+    filterValue = prevlowpass[num] + filterValue * cutoff[0];
     prevlowpass[num] = filterValue;
-    if (memory[SIDaddr + 0x18] & Bitmask.LOWPASS) output += filterValue;
+    if (memory[SIDaddr + 0x18] & Bitmask.LOWPASS) output[0] += filterValue;
 
     //when it comes to $D418 volume-register digi playback, I made an AC / DC separation for $D418 value in the SwinSID at low (20Hz or so) cutoff-frequency,
     //and sent the AC (highpass) value to a 4th 'digi' channel mixed to the master output, and set ONLY the DC (lowpass) value to the volume-control.
     //This solved 2 issues: Thanks to the lowpass filtering of the volume-control, SID tunes where digi is played together with normal SID channels,
     //won't sound distorted anymore, and the volume-clicks disappear when setting SID-volume. (This is useful for fade-in/out tunes like Hades Nebula, where clicking ruins the intro.)
-    return (output / OUTPUT_SCALEDOWN) * (memory[SIDaddr + 0x18] & 0xf);
+    return (output[0] / OUTPUT_SCALEDOWN) * (memory[SIDaddr + 0x18] & 0xf);
     // SID output
   }
 
@@ -379,54 +408,19 @@ export function createSID(
   }
 
   function getState() {
-    return {
-      ADSRstate: [...ADSRstate],
-      ratecnt: [...ratecnt],
-      envcnt: [...envcnt],
-      expcnt: [...expcnt],
-      prevSR: [...prevSR],
-      phaseaccu: [...phaseaccu],
-      prevaccu: [...prevaccu],
-      sourceMSBrise: [...sourceMSBrise],
-      sourceMSB: [...sourceMSB],
-      noise_LFSR: [...noise_LFSR],
-      prevwfout: [...prevwfout],
-      prevwavdata: [...prevwavdata],
-      prevlowpass: [...prevlowpass],
-      prevbandpass: [...prevbandpass],
-      wfout,
-      cutoff,
-      resonance,
-      filtin,
-      output,
-    };
+    return stateBuffer.slice(0);
   }
 
   function setState(state: ReturnType<typeof getState>) {
-    for (let i = 0; i < ADSRstate.length; i++) ADSRstate[i] = state.ADSRstate[i]!;
-    for (let i = 0; i < ratecnt.length; i++) ratecnt[i] = state.ratecnt[i]!;
-    for (let i = 0; i < envcnt.length; i++) envcnt[i] = state.envcnt[i]!;
-    for (let i = 0; i < expcnt.length; i++) expcnt[i] = state.expcnt[i]!;
-    for (let i = 0; i < prevSR.length; i++) prevSR[i] = state.prevSR[i]!;
-    for (let i = 0; i < phaseaccu.length; i++) phaseaccu[i] = state.phaseaccu[i]!;
-    for (let i = 0; i < prevaccu.length; i++) prevaccu[i] = state.prevaccu[i]!;
-    for (let i = 0; i < sourceMSBrise.length; i++) sourceMSBrise[i] = state.sourceMSBrise[i]!;
-    for (let i = 0; i < sourceMSB.length; i++) sourceMSB[i] = state.sourceMSB[i]!;
-    for (let i = 0; i < noise_LFSR.length; i++) noise_LFSR[i] = state.noise_LFSR[i]!;
-    for (let i = 0; i < prevwfout.length; i++) prevwfout[i] = state.prevwfout[i]!;
-    for (let i = 0; i < prevwavdata.length; i++) prevwavdata[i] = state.prevwavdata[i]!;
-    for (let i = 0; i < prevlowpass.length; i++) prevlowpass[i] = state.prevlowpass[i]!;
-    for (let i = 0; i < prevbandpass.length; i++) prevbandpass[i] = state.prevbandpass[i]!;
-    wfout = state.wfout;
-    cutoff = state.cutoff;
-    resonance = state.resonance;
-    filtin = state.filtin;
-    output = state.output;
+    if (state.byteLength !== stateBuffer.byteLength) {
+      throw new RangeError('Invalid SID state buffer size');
+    }
+    stateBytes.set(new Uint8Array(state));
   }
 
   //volume range: 0..1
   function getOutput() {
-    return (output / OUTPUT_SCALEDOWN) * (memory[0xd418] & 0xf);
+    return (output[0] / OUTPUT_SCALEDOWN) * (memory[0xd418] & 0xf);
   }
 
   function whittakerPlayerWorkaround(addr: number) {
