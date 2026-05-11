@@ -178,8 +178,8 @@ button {
   }
 
   h3 {
-    /*position: sticky;
-    top: 0;*/
+    position: sticky;
+    top: 0;
     font-weight: bold;
     line-height: 1.5rem;
     padding: 0.5rem 1rem;
