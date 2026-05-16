@@ -66,36 +66,38 @@ export function createCPU(memory: Uint8Array) {
 
   // The CPU emulation for SID/PRG playback (ToDo: CIA/VIC-IRQ/NMI/RESET vectors, BCD-mode)
   function tick() {
-    IR[0] = memory[PC[0]];
+    const opcode = (IR[0] = memory[PC[0]]);
     cycles[0] = 2; // ensure smallest 6510 runtime (for implied/register instructions)
     storadd[0] = 0;
     //nybble2:  1/5/9/D:accu.instructions, 3/7/B/F:illegal opcodes
     // Odd opcodes: ALU instructions (ORA/AND/EOR/ADC/SBC/CMP/LDA/STA)
-    if (IR[0] & 1) {
+    if (opcode & 1) {
       //addressing modes (begin with more complex cases), PC wraparound not handled inside to save codespace
-      switch (IR[0] & 0x1f) {
+      switch (opcode & 0x1f) {
         case 1: // (zp,X) indexed indirect
         case 3:
-          addr[0] = memory[memory[++PC[0]] + X[0]] + memory[memory[PC[0]] + X[0] + 1] * 256;
+          const zpXAddr = memory[++PC[0]] + X[0];
+          addr[0] = memory[zpXAddr] & (memory[zpXAddr + 1] << 8);
           cycles[0] = 6;
           break;
         case 0x11: // (zp),Y indirect indexed
         case 0x13:
-          addr[0] = memory[memory[++PC[0]]] + memory[memory[PC[0]] + 1] * 256 + Y[0];
+          const zpYAddr = memory[++PC[0]];
+          addr[0] = memory[zpYAddr] + (memory[zpYAddr + 1] << 8) + Y[0];
           cycles[0] = 6;
           break;
         case 0x19: // abs,Y absolute indexed Y
         case 0x1f:
-          addr[0] = memory[++PC[0]] + memory[++PC[0]] * 256 + Y[0];
+          addr[0] = memory[++PC[0]] + (memory[++PC[0]] << 8) + Y[0];
           cycles[0] = 5;
           break;
         case 0x1d: // abs,X absolute indexed X
-          addr[0] = memory[++PC[0]] + memory[++PC[0]] * 256 + X[0];
+          addr[0] = memory[++PC[0]] + (memory[++PC[0]] << 8) + X[0];
           cycles[0] = 5;
           break;
         case 0xd: // abs absolute
         case 0xf:
-          addr[0] = memory[++PC[0]] + memory[++PC[0]] * 256;
+          addr[0] = memory[++PC[0]] + (memory[++PC[0]] << 8);
           cycles[0] = 4;
           break;
         case 0x15: // zp,X zero page indexed X
@@ -117,7 +119,7 @@ export function createCPU(memory: Uint8Array) {
           cycles[0] = 2;
       }
       addr[0] &= 0xffff;
-      switch (IR[0] & 0xe0) {
+      switch (opcode & 0xe0) {
         case 0x60: //ADC
           T[0] = A[0];
           const adcResult = T[0] + memory[addr[0]] + (ST[0] & 1);
@@ -152,29 +154,29 @@ export function createCPU(memory: Uint8Array) {
         case 0xa0: //LDA / LAX (illegal, used by my 1 rasterline player)
           A[0] = memory[addr[0]];
           ST[0] = (ST[0] & 125) | (+!A[0] << 1) | (A[0] & 128);
-          if ((IR[0] & 3) === 3) X[0] = A[0];
+          if ((opcode & 3) === 3) X[0] = A[0];
           break;
         case 0x80: //STA / SAX (illegal)
-          memory[addr[0]] = A[0] & ((IR[0] & 3) === 3 ? X[0] : 0xff);
+          memory[addr[0]] = A[0] & ((opcode & 3) === 3 ? X[0] : 0xff);
           storadd[0] = addr[0];
       }
-    } else if (IR[0] & 2) {
+    } else if (opcode & 2) {
       // Even+2 opcodes: shift/memory/register (ASL/ROL/LSR/ROR/LDX/STX/INC/DEC)
       //nybble2: 2:illegal/LDX, 6:A/X/INC/DEC, A:Accu-shift/reg.transfer/NOP, E:shift/X/INC/DEC
       switch (
-        IR[0] & 0x1f //addressing modes
+        opcode & 0x1f //addressing modes
       ) {
         case 0x1e: //abs,x / abs,y
           addr[0] =
-            memory[++PC[0]] + memory[++PC[0]] * 256 + ((IR[0] & 0xc0) !== 0x80 ? X[0] : Y[0]);
+            memory[++PC[0]] + (memory[++PC[0]] << 8) + ((opcode & 0xc0) !== 0x80 ? X[0] : Y[0]);
           cycles[0] = 5;
           break;
         case 0xe: //abs
-          addr[0] = memory[++PC[0]] + memory[++PC[0]] * 256;
+          addr[0] = memory[++PC[0]] + (memory[++PC[0]] << 8);
           cycles[0] = 4;
           break;
         case 0x16: //zp,x / zp,y
-          addr[0] = memory[++PC[0]] + ((IR[0] & 0xc0) !== 0x80 ? X[0] : Y[0]);
+          addr[0] = memory[++PC[0]] + ((opcode & 0xc0) !== 0x80 ? X[0] : Y[0]);
           cycles[0] = 4;
           break;
         case 6: //zp
@@ -186,11 +188,11 @@ export function createCPU(memory: Uint8Array) {
           cycles[0] = 2;
       }
       addr[0] &= 0xffff;
-      switch (IR[0] & 0xe0) {
+      switch (opcode & 0xe0) {
         case 0x00:
           ST[0] &= 0xfe;
         case 0x20:
-          if ((IR[0] & 0xf) === 0xa) {
+          if ((opcode & 0xf) === 0xa) {
             //ASL/ROL (Accu)
             T[0] = (A[0] << 1) + (ST[0] & 1);
             A[0] = T[0]; // 8 bit overflow is handled by T being Int16
@@ -209,7 +211,7 @@ export function createCPU(memory: Uint8Array) {
         case 0x40:
           ST[0] &= 0xfe;
         case 0x60: //RMW
-          if ((IR[0] & 0xf) === 0xa) {
+          if ((opcode & 0xf) === 0xa) {
             //LSR/ROR (Accu)
             T[0] = A[0];
             A[0] = (A[0] >> 1) + (ST[0] & 1) * 128;
@@ -226,7 +228,7 @@ export function createCPU(memory: Uint8Array) {
           }
           break;
         case 0xc0: //DEC
-          if (IR[0] & 4) {
+          if (opcode & 4) {
             --memory[addr[0]];
             ST[0] = (ST[0] & 125) | (+!memory[addr[0]] << 1) | (memory[addr[0]] & 128);
             cycles[0] += 2;
@@ -236,14 +238,14 @@ export function createCPU(memory: Uint8Array) {
           }
           break;
         case 0xa0: //DEX
-          X[0] = (IR[0] & 0xf) !== 0xa ? memory[addr[0]] : IR[0] & 0x10 ? SP[0] : A[0];
+          X[0] = (opcode & 0xf) !== 0xa ? memory[addr[0]] : opcode & 0x10 ? SP[0] : A[0];
           ST[0] = (ST[0] & 125) | (+!X[0] << 1) | (X[0] & 128);
           break;
         case 0x80: //LDX/TSX/TAX
-          if (IR[0] & 4) {
+          if (opcode & 4) {
             memory[addr[0]] = X[0];
             storadd[0] = addr[0];
-          } else if (IR[0] & 0x10) {
+          } else if (opcode & 0x10) {
             SP[0] = X[0];
           } else {
             A[0] = X[0];
@@ -251,17 +253,17 @@ export function createCPU(memory: Uint8Array) {
           }
           break;
         case 0xe0: //STX/TXS/TXA
-          if (IR[0] & 4) {
+          if (opcode & 4) {
             //INC/NOP
             ++memory[addr[0]];
             ST[0] = (ST[0] & 125) | (+!memory[addr[0]] << 1) | (memory[addr[0]] & 128);
             cycles[0] += 2;
           }
       }
-    } else if ((IR[0] & 0xc) === 8) {
+    } else if ((opcode & 0xc) === 8) {
       // nybble2=8: stack and status register operations
       //nybble2:  8:register/status
-      switch (IR[0] & 0xf0) {
+      switch (opcode & 0xf0) {
         case 0x60:
           ++SP[0];
           A[0] = memory[0x100 + SP[0]];
@@ -313,26 +315,27 @@ export function createCPU(memory: Uint8Array) {
           break;
         //TAY
         default:
-          if (flagsw[IR[0] >> 5] & 0x20) ST[0] |= flagsw[IR[0] >> 5] & 0xdf;
-          else ST[0] &= 255 - (flagsw[IR[0] >> 5] & 0xdf);
+          const flagOperation = flagsw[opcode >> 5];
+          if (flagOperation & 0x20) ST[0] |= flagOperation & 0xdf;
+          else ST[0] &= 255 - (flagOperation & 0xdf);
         //CLC/SEC/CLI/SEI/CLV/CLD/SED
       }
     } else {
       // nybble2=0/4/C: control flow, branches, Y register, JMP/JSR/RTS/RTI
       //nybble2:  0: control/branch/Y/compare  4: Y/compare  C:Y/compare/JMP
-      if ((IR[0] & 0x1f) === 0x10) {
+      if ((opcode & 0x1f) === 0x10) {
         ++PC[0];
         T[0] = memory[PC[0]];
         if (T[0] & 0x80) T[0] -= 0x100;
         //BPL/BMI/BVC/BVS/BCC/BCS/BNE/BEQ  relative branch
-        if (!(IR[0] & 0x20) === !(ST[0] & branchflag[IR[0] >> 6])) {
+        if (!(opcode & 0x20) === !(ST[0] & branchflag[opcode >> 6])) {
           PC[0] += T[0];
           cycles[0] = 3;
         }
       } else {
         //nybble2:  0:Y/control/Y/compare  4:Y/compare  C:Y/compare/JMP
         //addressing modes
-        switch (IR[0] & 0x1f) {
+        switch (opcode & 0x1f) {
           case 0: //imm. (or abs.low for JSR/BRK)
             addr[0] = ++PC[0];
             cycles[0] = 2;
@@ -354,7 +357,7 @@ export function createCPU(memory: Uint8Array) {
             cycles[0] = 3;
         }
         addr[0] &= 0xffff;
-        switch (IR[0] & 0xe0) {
+        switch (opcode & 0xe0) {
           case 0x00: //BRK
             memory[0x100 + SP[0]] = PC[0] % 256;
             --SP[0];
@@ -366,7 +369,7 @@ export function createCPU(memory: Uint8Array) {
             cycles[0] = 7;
             break;
           case 0x20:
-            if (IR[0] & 0xf) {
+            if (opcode & 0xf) {
               //BIT
               ST[0] = (ST[0] & 0x3d) | (memory[addr[0]] & 0xc0) | (+!(A[0] & memory[addr[0]]) << 1);
             } else {
@@ -380,7 +383,7 @@ export function createCPU(memory: Uint8Array) {
             }
             break;
           case 0x40:
-            if (IR[0] & 0xf) {
+            if (opcode & 0xf) {
               //JMP
               PC[0] = addr[0] - 1;
               cycles[0] = 3;
@@ -397,7 +400,7 @@ export function createCPU(memory: Uint8Array) {
             }
             break;
           case 0x60:
-            if (IR[0] & 0xf) {
+            if (opcode & 0xf) {
               //JMP() (indirect)
               PC[0] = memory[addr[0]] + memory[addr[0] + 1] * 256 - 1;
               cycles[0] = 5;

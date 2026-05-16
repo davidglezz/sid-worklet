@@ -1,5 +1,6 @@
 const SID_CHANNEL_AMOUNT = 3;
 const OUTPUT_SCALEDOWN = 0x10000 * SID_CHANNEL_AMOUNT * 16;
+const ENV_SCALE = 1 / 256;
 
 const Bitmask = {
   GATE: 0x01,
@@ -40,6 +41,9 @@ const ADSR_exptable = [
 // Waveforms
 function createCombineWaveForm(bitmul: number, bitstrength: number, treshold: number) {
   const waveform = Array.from<number>({ length: 4096 });
+  const attenuation = Array.from({ length: 12 }, (_, j) =>
+    Array.from({ length: 12 }, (_, k) => bitmul / bitstrength ** Math.abs(k - j)),
+  );
   // Neighboring bits affect each other recursively
   for (let i = 0; i < 4096; i++) {
     let value = 0;
@@ -47,7 +51,7 @@ function createCombineWaveForm(bitmul: number, bitstrength: number, treshold: nu
     for (let j = 0; j < 12; j++) {
       let bitlevel = 0;
       for (let k = 0; k < 12; k++) {
-        bitlevel += (bitmul / bitstrength ** Math.abs(k - j)) * (((i >> k) & 1) - 0.5);
+        bitlevel += attenuation[j][k] * (((i >> k) & 1) - 0.5);
       }
       value += bitlevel >= treshold ? 2 ** j : 0;
     }
@@ -139,15 +143,16 @@ export function createSID(
     //the SID emulation itself ('num' is the number of SID to iterate (0..2)
     filtin[0] = 0;
     output[0] = 0;
+    const channelStart = num * SID_CHANNEL_AMOUNT;
+    const channelEnd = channelStart + SID_CHANNEL_AMOUNT;
+    const filterRoute = memory[SIDaddr + 0x17];
+    const volumeFilter = memory[SIDaddr + 0x18];
 
     //treating 2SID and 3SID channels uniformly (0..5 / 0..8), this probably avoids some extra code
-    for (
-      let channel = num * SID_CHANNEL_AMOUNT;
-      channel < (num + 1) * SID_CHANNEL_AMOUNT;
-      channel++
-    ) {
+    for (let channel = channelStart; channel < channelEnd; channel++) {
+      const voiceIndex = channel - channelStart;
       const prevgate = ADSRstate[channel] & Bitmask.GATE;
-      const chnadd = SIDaddr + (channel - num * SID_CHANNEL_AMOUNT) * 7;
+      const chnadd = SIDaddr + voiceIndex * 7;
       const ctrl = memory[chnadd + 4];
       const wf = ctrl & 0xf0;
       const test = ctrl & Bitmask.TEST;
@@ -353,10 +358,11 @@ export function createSID(
       //(So the decay is not an exact value. Anyway, we just simply keep the value to avoid clicks and support SounDemon digi later...)
 
       //routing the channel signal to either the filter or the unfiltered master output depending on filter-switch SID-registers
-      if (memory[SIDaddr + 0x17] & FILTSW[channel]) {
-        filtin[0] += (wfout[0] - 0x8000) * (envcnt[channel] / 256);
-      } else if (channel % SID_CHANNEL_AMOUNT !== 2 || !(memory[SIDaddr + 0x18] & Bitmask.OFF3)) {
-        output[0] += (wfout[0] - 0x8000) * (envcnt[channel] / 256);
+      const channelOutput = (wfout[0] - 0x8000) * (envcnt[channel] * ENV_SCALE);
+      if (filterRoute & FILTSW[channel]) {
+        filtin[0] += channelOutput;
+      } else if (voiceIndex !== 2 || !(volumeFilter & Bitmask.OFF3)) {
+        output[0] += channelOutput;
       }
     }
 
@@ -368,28 +374,30 @@ export function createSID(
     //FILTER: two integrator loop bi-quadratic filter, workings learned from resid code, but I kindof simplified the equations
     //The phases of lowpass and highpass outputs are inverted compared to the input, but bandpass IS in phase with the input signal.
     //The 8580 cutoff frequency control-curve is ideal, while the 6581 has a treshold, and below it it outputs a constant lowpass frequency.
-    cutoff[0] = (memory[SIDaddr + 0x15] & 7) / 8 + memory[SIDaddr + 0x16] + 0.2;
+    const filterCutoffLo = memory[SIDaddr + 0x15];
+    const filterCutoffHi = memory[SIDaddr + 0x16];
+    cutoff[0] = (filterCutoffLo & 7) / 8 + filterCutoffHi + 0.2;
     if (SID_model[num] === 8580) {
       cutoff[0] = 1 - Math.exp(cutoff[0] * cutoff_ratio_8580);
-      resonance[0] = 2 ** ((4 - (memory[SIDaddr + 0x17] >> 4)) / 8);
+      resonance[0] = 2 ** ((4 - (filterRoute >> 4)) / 8);
     } else {
       cutoff[0] = cutoff[0] < 24 ? 0.035 : 1 - 1.263 * Math.exp(cutoff[0] * cutoff_ratio_6581);
-      resonance[0] = memory[SIDaddr + 0x17] > 0x5f ? 8 / (memory[SIDaddr + 0x17] >> 4) : 1.41;
+      resonance[0] = filterRoute > 0x5f ? 8 / (filterRoute >> 4) : 1.41;
     }
     let filterValue = filtin[0] + prevbandpass[num] * resonance[0] + prevlowpass[num];
-    if (memory[SIDaddr + 0x18] & Bitmask.HIGHPASS) output[0] -= filterValue;
+    if (volumeFilter & Bitmask.HIGHPASS) output[0] -= filterValue;
     filterValue = prevbandpass[num] - filterValue * cutoff[0];
     prevbandpass[num] = filterValue;
-    if (memory[SIDaddr + 0x18] & Bitmask.BANDPASS) output[0] -= filterValue;
+    if (volumeFilter & Bitmask.BANDPASS) output[0] -= filterValue;
     filterValue = prevlowpass[num] + filterValue * cutoff[0];
     prevlowpass[num] = filterValue;
-    if (memory[SIDaddr + 0x18] & Bitmask.LOWPASS) output[0] += filterValue;
+    if (volumeFilter & Bitmask.LOWPASS) output[0] += filterValue;
 
     //when it comes to $D418 volume-register digi playback, I made an AC / DC separation for $D418 value in the SwinSID at low (20Hz or so) cutoff-frequency,
     //and sent the AC (highpass) value to a 4th 'digi' channel mixed to the master output, and set ONLY the DC (lowpass) value to the volume-control.
     //This solved 2 issues: Thanks to the lowpass filtering of the volume-control, SID tunes where digi is played together with normal SID channels,
     //won't sound distorted anymore, and the volume-clicks disappear when setting SID-volume. (This is useful for fade-in/out tunes like Hades Nebula, where clicking ruins the intro.)
-    return (output[0] / OUTPUT_SCALEDOWN) * (memory[SIDaddr + 0x18] & 0xf);
+    return (output[0] / OUTPUT_SCALEDOWN) * (volumeFilter & 0xf);
     // SID output
   }
 
