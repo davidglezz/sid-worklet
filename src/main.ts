@@ -164,9 +164,9 @@ async function load(songName: string) {
   }
 
   parts.currentSongLink?.classList.remove('active');
-  parts.songlist
-    .querySelector<HTMLAnchorElement>(`a[data-song="${CSS.escape(songName)}"]`)
-    ?.classList.add('active');
+  const nextSongLink = parts.songlist.querySelector(`a[data-song="${CSS.escape(songName)}"]`);
+  nextSongLink?.classList.add('active');
+  nextSongLink?.scrollIntoView({ block: 'center' });
 
   parts.subsong.value = '0';
   parts.position.value = '0';
