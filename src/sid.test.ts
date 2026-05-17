@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import { readFileSync } from 'node:fs';
 import type { Buffer } from 'node:buffer';
 import { describe, it } from 'vitest';
@@ -215,6 +216,6 @@ describe('seek — edge cases', () => {
   }, 120_000); // up to 2 min — 31 s of emulated C64 audio takes real time
 });
 
-function toArrayBuffer(buffer: Buffer) {
+function toArrayBuffer(buffer: Buffer<ArrayBuffer>) {
   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
 }
