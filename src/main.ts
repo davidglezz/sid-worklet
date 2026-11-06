@@ -266,3 +266,16 @@ async function* splitLines(stream: ReadableStream<string>) {
     yield pendingLine;
   }
 }
+
+// Add a button for playing a random song
+const randomButton = document.createElement('button');
+randomButton.id = 'random';
+randomButton.className = 'btn';
+randomButton.innerHTML = '🎲'; // Dice icon
+randomButton.title = 'Play Random Song';
+parts.songlist.insertAdjacentElement('beforebegin', randomButton);
+
+randomButton.addEventListener('click', async () => {
+  const randomSong = getRandomSong();
+  await load(randomSong);
+});
