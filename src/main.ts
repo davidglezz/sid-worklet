@@ -334,9 +334,9 @@ randomButton.id = 'random';
 randomButton.className = 'btn';
 randomButton.innerHTML = '🎲'; // Dice icon
 randomButton.title = 'Play Random Song';
-parts.songlist.insertAdjacentElement('beforebegin', randomButton);
+parts.volumeLabel.before(randomButton);
 
 randomButton.addEventListener('click', () => {
   const randomSong = getRandomSong();
-  void load(randomSong).catch(showError);
+  void play(randomSong).catch(showError);
 });
