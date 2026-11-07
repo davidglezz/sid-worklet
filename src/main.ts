@@ -213,6 +213,13 @@ async function* streamSongList(): AsyncGenerator<Song> {
   }
 }
 
+function formatListDuration(totalSeconds: number): string {
+  const total = Math.max(0, Math.floor(totalSeconds));
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
 function createSongLink(song: Song): HTMLAnchorElement {
   const link = document.createElement('a');
   link.dataset.song = song.relativeUrl;
@@ -221,7 +228,9 @@ function createSongLink(song: Song): HTMLAnchorElement {
   link.href = `#${song.relativeUrl}`;
   const duration =
     song.durations.length > 1
-      ? formatTime(song.durations.reduce((sum, d) => sum + parseDuration(d), 0))
+      ? `${song.durations.length} subsongs · ${formatListDuration(
+          song.durations.reduce((sum, d) => sum + parseDuration(d), 0),
+        )}`
       : (song.durations[0] ?? '');
   const durationSpan = document.createElement('span');
   durationSpan.textContent = duration;
