@@ -25,7 +25,7 @@ const SONGS = [
 ];
 
 for (const name of SONGS) {
-  test(`differential: ${name}`, async () => {
+  void test(`differential: ${name}`, async () => {
     const bytes = new Uint8Array(readFileSync(`../test-songs/${name}.sid`));
     const compiled = await compileSid(bytes);
     const loaded = await loadWasmSong(compiled.wasm);
