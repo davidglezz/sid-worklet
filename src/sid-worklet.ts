@@ -1,4 +1,5 @@
 import { SIDPlayer } from './sid.ts';
+import type { SidSnapshot } from './sid-snapshot.ts';
 
 /// <reference types="@types/audioworklet" />
 
@@ -22,6 +23,7 @@ export interface InputMessagesMap {
   setPosition: { value: number };
   setSubsong: { value: number };
   setDuration: { value: number };
+  applyState: { state: SidSnapshot };
 }
 
 export interface OutputMessagesMap {
@@ -64,6 +66,9 @@ class SIDProcessor extends AudioWorkletProcessor implements AudioWorkletProcesso
           break;
         case 'setDuration':
           this.setDuration(message);
+          break;
+        case 'applyState':
+          this.applyState(message);
           break;
         default:
           this.port.postMessage({
@@ -130,6 +135,13 @@ class SIDProcessor extends AudioWorkletProcessor implements AudioWorkletProcesso
 
   setDuration({ value }: InputMessagesMap['setDuration']) {
     this.duration = Number.isFinite(value) ? Math.max(0, value) : 0;
+  }
+
+  applyState({ state }: InputMessagesMap['applyState']) {
+    this.pendingSeek = null;
+    this.sid.setSnapshot(state);
+    this.port.postMessage({ id: 'songInfo', songInfo: this.getSongInfo() });
+    this.port.postMessage({ id: 'position', value: this.sid.playtime });
   }
 
   getSongInfo(): SongInfo {

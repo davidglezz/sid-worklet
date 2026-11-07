@@ -3,6 +3,7 @@
 import { createCPU } from './cpu.ts';
 import { copySidImage, parseSidHeader } from './sid-header.ts';
 import { createSID } from './sid-device.ts';
+import type { SidSnapshot } from './sid-snapshot.ts';
 
 //emulated machine constants
 const C64_PAL_CPUCLK = 985248; //Hz
@@ -327,6 +328,38 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
     playlength = seconds;
   }
 
+  function getSnapshot(): SidSnapshot {
+    return {
+      memory: memory.slice(),
+      cpu: CPU.getState(),
+      sid: SID.getState(),
+      playtime,
+      CPUtime,
+      framecnt,
+      frame_sampleperiod,
+      finished,
+      ended,
+      playaddr,
+      subtune,
+    };
+  }
+
+  function setSnapshot(snapshot: SidSnapshot) {
+    memory.set(snapshot.memory);
+    CPU.setState(snapshot.cpu);
+    SID.setState(snapshot.sid);
+    playtime = snapshot.playtime;
+    CPUtime = snapshot.CPUtime;
+    framecnt = snapshot.framecnt;
+    frame_sampleperiod = snapshot.frame_sampleperiod;
+    finished = snapshot.finished;
+    ended = snapshot.ended;
+    playaddr = snapshot.playaddr;
+    subtune = snapshot.subtune;
+    nextCheckpointTime = (Math.floor(playtime / CHECKPOINT_INTERVAL) + 1) * CHECKPOINT_INTERVAL;
+    initialized = 1;
+  }
+
   return {
     unload,
     load,
@@ -334,6 +367,8 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
     play,
     render,
     seek,
+    getSnapshot,
+    setSnapshot,
     get playtime() {
       return playtime;
     },

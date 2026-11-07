@@ -237,6 +237,30 @@ describe('render', () => {
   });
 });
 
+describe('snapshot transfer', () => {
+  it('continues exactly after applying a seeked snapshot', ({ expect }) => {
+    const sampleRate = 44100;
+    const songBytes = toArrayBuffer(readFileSync('test-songs/adsrtest.sid'));
+    const seekTarget = 5.5;
+
+    const source = SIDPlayer(sampleRate);
+    source.load(songBytes);
+    source.seek(seekTarget);
+
+    const target = SIDPlayer(sampleRate);
+    target.load(songBytes);
+    target.setSnapshot(source.getSnapshot());
+
+    const reference = SIDPlayer(sampleRate);
+    reference.load(songBytes);
+    for (let i = 0; i < Math.floor(seekTarget * sampleRate); i++) reference.play();
+
+    for (let i = 0; i < 1000; i++) {
+      expect(target.play()).toEqual(reference.play());
+    }
+  });
+});
+
 function toArrayBuffer(buffer: Buffer<ArrayBuffer>) {
   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
 }

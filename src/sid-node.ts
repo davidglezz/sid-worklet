@@ -1,3 +1,4 @@
+import type { SidSnapshot } from './sid-snapshot.ts';
 import type { InputMessages, OutputMessages, SongInfo } from './sid-worklet';
 
 interface EventMap {
@@ -52,5 +53,9 @@ export class SIDNode extends AudioWorkletNode {
 
   setDuration(seconds: number) {
     this.sendMessage({ id: 'setDuration', value: seconds });
+  }
+
+  applyState(state: SidSnapshot) {
+    this.sendMessage({ id: 'applyState', state });
   }
 }

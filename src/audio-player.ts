@@ -1,3 +1,4 @@
+import type { SeekWorkerRequest, SeekWorkerResponse } from './seek-protocol.ts';
 import { SIDNode } from './sid-node.ts';
 import type { SongInfo } from './sid-worklet.ts';
 import SIDProcessor from './sid-worklet.ts?worker&url';
@@ -27,6 +28,11 @@ export class AudioPlayer extends EventTarget {
   private pendingSubsong: number | null = null;
   private pendingVisualizer: AudioNode | null = null;
   private visualizer: AudioNode | null = null;
+  private seekWorker: Worker | null = null;
+  private seekRequestId = 0;
+  private workerFailed = false;
+  private hasLoaded = false;
+  private lastSeekTarget: number | null = null;
 
   constructor() {
     super();
@@ -36,6 +42,7 @@ export class AudioPlayer extends EventTarget {
     }
     this.gainNode = this.context.createGain();
     this.gainNode.connect(this.context.destination);
+    this.seekWorker = this.createSeekWorker();
 
     this.readyPromise = this.context.audioWorklet
       .addModule(SIDProcessor)
@@ -65,6 +72,40 @@ export class AudioPlayer extends EventTarget {
         this.dispatchEvent(new PlayerErrorEvent(toError(error)));
         throw error;
       });
+  }
+
+  private createSeekWorker(): Worker | null {
+    if (typeof Worker === 'undefined') return null;
+    try {
+      const worker = new Worker(new URL('./seek-worker.ts', import.meta.url), { type: 'module' });
+      worker.onmessage = (event: MessageEvent<SeekWorkerResponse>) => {
+        this.handleSeekWorkerMessage(event.data);
+      };
+      worker.onerror = (event) => {
+        this.workerFailed = true;
+        this.dispatchEvent(new PlayerErrorEvent(new Error(event.message || 'Seek worker failed')));
+      };
+      return worker;
+    } catch {
+      this.workerFailed = true;
+      return null;
+    }
+  }
+
+  private handleSeekWorkerMessage(message: SeekWorkerResponse) {
+    if (message.id === 'seeked') {
+      if (message.requestId !== this.seekRequestId) return;
+      this.playerNode?.applyState(message.snapshot);
+      return;
+    }
+
+    this.workerFailed = true;
+    this.dispatchEvent(new PlayerErrorEvent(new Error(message.message)));
+    if (this.lastSeekTarget !== null && this.playerNode && this.hasLoaded) {
+      const target = this.lastSeekTarget;
+      this.lastSeekTarget = null;
+      this.playerNode.setPosition(target);
+    }
   }
 
   /**
@@ -113,15 +154,29 @@ export class AudioPlayer extends EventTarget {
     try {
       await this.readyPromise;
       const songData = await this.download(url);
+      this.hasLoaded = false;
+      this.lastSeekTarget = null;
+      this.seekRequestId++;
       this.playerNode.setDuration(durationSeconds);
       this.playerNode.load(songData);
+      this.hasLoaded = true;
+      if (this.seekWorker && !this.workerFailed) {
+        const message: SeekWorkerRequest = {
+          id: 'load',
+          songData,
+          sampleRate: this.context.sampleRate,
+        };
+        this.seekWorker.postMessage(message);
+      }
       if (this.pendingSubsong !== null) {
-        this.playerNode.setSubsong(this.pendingSubsong);
+        const value = this.pendingSubsong;
         this.pendingSubsong = null;
+        this.setSubsong(value);
       }
       if (this.pendingPosition !== null) {
-        this.playerNode.setPosition(this.pendingPosition);
+        const value = this.pendingPosition;
         this.pendingPosition = null;
+        this.setPosition(value);
       }
     } catch (err) {
       if (!this.readyFailed) {
@@ -136,19 +191,35 @@ export class AudioPlayer extends EventTarget {
    * @param value Position in seconds (canonical unit).
    */
   setPosition(value: number) {
-    if (!this.playerNode) {
+    if (!this.playerNode || !this.hasLoaded) {
       this.pendingPosition = value;
       return;
     }
+
+    if (this.seekWorker && !this.workerFailed) {
+      const requestId = ++this.seekRequestId;
+      this.lastSeekTarget = value;
+      const message: SeekWorkerRequest = { id: 'seek', requestId, target: value };
+      this.seekWorker.postMessage(message);
+      return;
+    }
+
     this.playerNode.setPosition(value);
   }
 
   setSubsong(value: number) {
-    if (!this.playerNode) {
+    if (!this.playerNode || !this.hasLoaded) {
       this.pendingSubsong = value;
       return;
     }
+
     this.playerNode.setSubsong(value);
+    this.seekRequestId++;
+    this.lastSeekTarget = null;
+    if (this.seekWorker && !this.workerFailed) {
+      const message: SeekWorkerRequest = { id: 'setSubsong', value };
+      this.seekWorker.postMessage(message);
+    }
   }
 
   /**
