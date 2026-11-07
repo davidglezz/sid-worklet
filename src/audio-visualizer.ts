@@ -9,10 +9,11 @@ export class AudioVisualizer {
 
   constructor(audioCtx: AudioContext, canvas: HTMLCanvasElement, type: VisualizerType = 'off') {
     this.canvas = canvas;
-    this.canvasCtx = canvas.getContext('2d')!;
-    if (!this.canvasCtx) {
+    const canvasCtx = canvas.getContext('2d');
+    if (!canvasCtx) {
       throw new Error("Couldn't get canvas context!");
     }
+    this.canvasCtx = canvasCtx;
 
     this.analyser = audioCtx.createAnalyser();
     this.analyser.minDecibels = -90;
