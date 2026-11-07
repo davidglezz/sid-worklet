@@ -219,12 +219,11 @@ function createSongLink(song: Song): HTMLAnchorElement {
   link.dataset.duration = song.durations.join(',');
   link.textContent = song.name.replaceAll('_', ' ');
   link.href = `#${song.relativeUrl}`;
+  const totalDuration = song.durations.reduce((sum, d) => sum + parseDuration(d), 0);
   const duration =
     song.durations.length > 1
-      ? `${song.durations.length} subsongs · ${formatTime(
-          song.durations.reduce((sum, d) => sum + parseDuration(d), 0),
-        )}`
-      : (song.durations[0] ?? '');
+      ? `${song.durations.length} · ${formatTime(totalDuration)}`
+      : formatTime(totalDuration);
   const durationSpan = document.createElement('span');
   durationSpan.textContent = duration;
   link.appendChild(durationSpan);
