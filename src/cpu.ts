@@ -35,7 +35,6 @@ export function createCPU(memory: Uint8Array) {
   const AOffset = reserveState(1, Uint8Array.BYTES_PER_ELEMENT);
   const XOffset = reserveState(1, Uint8Array.BYTES_PER_ELEMENT);
   const YOffset = reserveState(1, Uint8Array.BYTES_PER_ELEMENT);
-  const IROffset = reserveState(1, Uint8Array.BYTES_PER_ELEMENT);
   const SPOffset = reserveState(1, Uint8Array.BYTES_PER_ELEMENT);
   const STOffset = reserveState(1, Uint8Array.BYTES_PER_ELEMENT);
   const cyclesOffset = reserveState(1, Uint8Array.BYTES_PER_ELEMENT);
@@ -48,7 +47,6 @@ export function createCPU(memory: Uint8Array) {
   const A = new Uint8Array(stateBuffer, AOffset, 1);
   const X = new Uint8Array(stateBuffer, XOffset, 1);
   const Y = new Uint8Array(stateBuffer, YOffset, 1);
-  const IR = new Uint8Array(stateBuffer, IROffset, 1); // instruction-register
   const SP = new Uint8Array(stateBuffer, SPOffset, 1);
   const ST = new Uint8Array(stateBuffer, STOffset, 1);
   const cycles = new Uint8Array(stateBuffer, cyclesOffset, 1);
@@ -66,7 +64,7 @@ export function createCPU(memory: Uint8Array) {
 
   // The CPU emulation for SID/PRG playback (ToDo: CIA/VIC-IRQ/NMI/RESET vectors, BCD-mode)
   function tick() {
-    const opcode = (IR[0] = memory[PC[0]]);
+    const opcode = memory[PC[0]];
     cycles[0] = 2; // ensure smallest 6510 runtime (for implied/register instructions)
     storadd[0] = 0;
     //nybble2:  1/5/9/D:accu.instructions, 3/7/B/F:illegal opcodes
@@ -119,46 +117,48 @@ export function createCPU(memory: Uint8Array) {
           cycles[0] = 2;
       }
       addr[0] &= 0xffff;
+      const address = addr[0];
       switch (opcode & 0xe0) {
         case 0x60: //ADC
           T[0] = A[0];
-          const adcResult = T[0] + memory[addr[0]] + (ST[0] & 1);
+          const adcValue = memory[address];
+          const adcResult = T[0] + adcValue + (ST[0] & 1);
           A[0] = adcResult;
           ST[0] = (ST[0] & 20) | (A[0] & 128) | +(adcResult > 255);
-          ST[0] |=
-            (+!A[0] << 1) | (+(!((T[0] ^ memory[addr[0]]) & 0x80) && (T[0] ^ A[0]) & 0x80) >> 1);
+          ST[0] |= (+!A[0] << 1) | (+(!((T[0] ^ adcValue) & 0x80) && (T[0] ^ A[0]) & 0x80) >> 1);
           break;
         case 0xe0: //SBC
           T[0] = A[0];
-          const sbcResult = T[0] - memory[addr[0]] - +!(ST[0] & 1);
+          const sbcValue = memory[address];
+          const sbcResult = T[0] - sbcValue - +!(ST[0] & 1);
           A[0] = sbcResult;
           ST[0] = (ST[0] & 20) | (A[0] & 128) | +(sbcResult >= 0);
-          ST[0] |= (+!A[0] << 1) | (((T[0] ^ memory[addr[0]]) & 0x80 && (T[0] ^ A[0]) & 0x80) >> 1);
+          ST[0] |= (+!A[0] << 1) | (((T[0] ^ sbcValue) & 0x80 && (T[0] ^ A[0]) & 0x80) >> 1);
           break;
         case 0xc0: //CMP
-          T[0] = A[0] - memory[addr[0]];
+          T[0] = A[0] - memory[address];
           ST[0] = (ST[0] & 124) | (+!(T[0] & 0xff) << 1) | (T[0] & 128) | +(T[0] >= 0);
           break;
         case 0x00: //ORA
-          A[0] |= memory[addr[0]];
+          A[0] |= memory[address];
           ST[0] = (ST[0] & 125) | (+!A[0] << 1) | (A[0] & 128);
           break;
         case 0x20: //AND
-          A[0] &= memory[addr[0]];
+          A[0] &= memory[address];
           ST[0] = (ST[0] & 125) | (+!A[0] << 1) | (A[0] & 128);
           break;
         case 0x40: //EOR
-          A[0] ^= memory[addr[0]];
+          A[0] ^= memory[address];
           ST[0] = (ST[0] & 125) | (+!A[0] << 1) | (A[0] & 128);
           break;
         case 0xa0: //LDA / LAX (illegal, used by my 1 rasterline player)
-          A[0] = memory[addr[0]];
+          A[0] = memory[address];
           ST[0] = (ST[0] & 125) | (+!A[0] << 1) | (A[0] & 128);
           if ((opcode & 3) === 3) X[0] = A[0];
           break;
         case 0x80: //STA / SAX (illegal)
-          memory[addr[0]] = A[0] & ((opcode & 3) === 3 ? X[0] : 0xff);
-          storadd[0] = addr[0];
+          memory[address] = A[0] & ((opcode & 3) === 3 ? X[0] : 0xff);
+          storadd[0] = address;
       }
     } else if (opcode & 2) {
       // Even+2 opcodes: shift/memory/register (ASL/ROL/LSR/ROR/LDX/STX/INC/DEC)
@@ -188,6 +188,7 @@ export function createCPU(memory: Uint8Array) {
           cycles[0] = 2;
       }
       addr[0] &= 0xffff;
+      const address = addr[0];
       switch (opcode & 0xe0) {
         case 0x00:
           ST[0] &= 0xfe;
@@ -200,11 +201,11 @@ export function createCPU(memory: Uint8Array) {
             ST[0] |= +!A[0] << 1;
           } else {
             //RMW (Read-Write-Modify)
-            T[0] = (memory[addr[0]] << 1) + (ST[0] & 1);
+            T[0] = (memory[address] << 1) + (ST[0] & 1);
             ST[0] = (ST[0] & 60) | (T[0] & 128) | +(T[0] > 255);
             T[0] &= 0xff;
             ST[0] |= +!T[0] << 1;
-            memory[addr[0]] = T[0];
+            memory[address] = T[0];
             cycles[0] += 2;
           }
           break;
@@ -219,18 +220,20 @@ export function createCPU(memory: Uint8Array) {
             A[0] &= 0xff;
             ST[0] |= +!A[0] << 1;
           } else {
-            T[0] = (memory[addr[0]] >> 1) + (ST[0] & 1) * 128;
-            ST[0] = (ST[0] & 60) | (T[0] & 128) | (memory[addr[0]] & 1);
+            const value = memory[address];
+            T[0] = (value >> 1) + (ST[0] & 1) * 128;
+            ST[0] = (ST[0] & 60) | (T[0] & 128) | (value & 1);
             T[0] &= 0xff;
             ST[0] |= +!T[0] << 1;
-            memory[addr[0]] = T[0];
+            memory[address] = T[0];
             cycles[0] += 2;
           }
           break;
         case 0xc0: //DEC
           if (opcode & 4) {
-            --memory[addr[0]];
-            ST[0] = (ST[0] & 125) | (+!memory[addr[0]] << 1) | (memory[addr[0]] & 128);
+            const value = (memory[address] - 1) & 0xff;
+            memory[address] = value;
+            ST[0] = (ST[0] & 125) | (+!value << 1) | (value & 128);
             cycles[0] += 2;
           } else {
             --X[0];
@@ -238,13 +241,13 @@ export function createCPU(memory: Uint8Array) {
           }
           break;
         case 0xa0: //DEX
-          X[0] = (opcode & 0xf) !== 0xa ? memory[addr[0]] : opcode & 0x10 ? SP[0] : A[0];
+          X[0] = (opcode & 0xf) !== 0xa ? memory[address] : opcode & 0x10 ? SP[0] : A[0];
           ST[0] = (ST[0] & 125) | (+!X[0] << 1) | (X[0] & 128);
           break;
         case 0x80: //LDX/TSX/TAX
           if (opcode & 4) {
-            memory[addr[0]] = X[0];
-            storadd[0] = addr[0];
+            memory[address] = X[0];
+            storadd[0] = address;
           } else if (opcode & 0x10) {
             SP[0] = X[0];
           } else {
@@ -255,8 +258,9 @@ export function createCPU(memory: Uint8Array) {
         case 0xe0: //STX/TXS/TXA
           if (opcode & 4) {
             //INC/NOP
-            ++memory[addr[0]];
-            ST[0] = (ST[0] & 125) | (+!memory[addr[0]] << 1) | (memory[addr[0]] & 128);
+            const value = (memory[address] + 1) & 0xff;
+            memory[address] = value;
+            ST[0] = (ST[0] & 125) | (+!value << 1) | (value & 128);
             cycles[0] += 2;
           }
       }
@@ -357,6 +361,7 @@ export function createCPU(memory: Uint8Array) {
             cycles[0] = 3;
         }
         addr[0] &= 0xffff;
+        const address = addr[0];
         switch (opcode & 0xe0) {
           case 0x00: //BRK
             memory[0x100 + SP[0]] = PC[0] % 256;
@@ -371,21 +376,22 @@ export function createCPU(memory: Uint8Array) {
           case 0x20:
             if (opcode & 0xf) {
               //BIT
-              ST[0] = (ST[0] & 0x3d) | (memory[addr[0]] & 0xc0) | (+!(A[0] & memory[addr[0]]) << 1);
+              const value = memory[address];
+              ST[0] = (ST[0] & 0x3d) | (value & 0xc0) | (+!(A[0] & value) << 1);
             } else {
               //JSR
               memory[0x100 + SP[0]] = (PC[0] + 2) % 256;
               --SP[0];
               memory[0x100 + SP[0]] = (PC[0] + 2) / 256;
               --SP[0];
-              PC[0] = memory[addr[0]] + memory[addr[0] + 1] * 256 - 1;
+              PC[0] = memory[address] + memory[address + 1] * 256 - 1;
               cycles[0] = 6;
             }
             break;
           case 0x40:
             if (opcode & 0xf) {
               //JMP
-              PC[0] = addr[0] - 1;
+              PC[0] = address - 1;
               cycles[0] = 3;
             } else {
               //RTI
@@ -402,7 +408,7 @@ export function createCPU(memory: Uint8Array) {
           case 0x60:
             if (opcode & 0xf) {
               //JMP() (indirect)
-              PC[0] = memory[addr[0]] + memory[addr[0] + 1] * 256 - 1;
+              PC[0] = memory[address] + memory[address + 1] * 256 - 1;
               cycles[0] = 5;
             } else {
               //RTS
@@ -415,20 +421,20 @@ export function createCPU(memory: Uint8Array) {
             }
             break;
           case 0xc0: //CPY
-            T[0] = Y[0] - memory[addr[0]];
+            T[0] = Y[0] - memory[address];
             ST[0] = (ST[0] & 124) | (+!(T[0] & 0xff) << 1) | (T[0] & 128) | +(T[0] >= 0);
             break;
           case 0xe0: //CPX
-            T[0] = X[0] - memory[addr[0]];
+            T[0] = X[0] - memory[address];
             ST[0] = (ST[0] & 124) | (+!(T[0] & 0xff) << 1) | (T[0] & 128) | +(T[0] >= 0);
             break;
           case 0xa0: //LDY
-            Y[0] = memory[addr[0]];
+            Y[0] = memory[address];
             ST[0] = (ST[0] & 125) | (+!Y[0] << 1) | (Y[0] & 128);
             break;
           case 0x80: //STY
-            memory[addr[0]] = Y[0];
-            storadd[0] = addr[0];
+            memory[address] = Y[0];
+            storadd[0] = address;
         }
       }
     }
