@@ -144,12 +144,14 @@ export function createSID(
 
   function emulate(num: number, SIDaddr: number) {
     //the SID emulation itself ('num' is the number of SID to iterate (0..2)
-    filtin[0] = 0;
-    output[0] = 0;
     const channelStart = num * SID_CHANNEL_AMOUNT;
     const channelEnd = channelStart + SID_CHANNEL_AMOUNT;
     const filterRoute = memory[SIDaddr + 0x17];
     const volumeFilter = memory[SIDaddr + 0x18];
+    const is8580 = SID_model[num] === 8580;
+    const is6581 = !is8580;
+    let filtinValue = 0;
+    let outputValue = 0;
 
     //treating 2SID and 3SID channels uniformly (0..5 / 0..8), this probably avoids some extra code
     for (let channel = channelStart; channel < channelEnd; channel++) {
@@ -308,11 +310,11 @@ export function createSID(
           if (wf & Bitmask.TRI) {
             // pulse+triangle+saw (waveform nearly identical to tri+saw)
             if (wf & Bitmask.SAW) {
-              wfout[0] = combinedWaveForm(num, channel, PulseTriSaw_8580, phase >> 4, 1);
+              wfout[0] = combinedWaveForm(is6581, channel, PulseTriSaw_8580, phase >> 4, 1);
             } else {
               const value = phaseaccu[channel] ^ (ctrl & Bitmask.RING ? sourceMSB[num] : 0);
               wfout[0] = combinedWaveForm(
-                num,
+                is6581,
                 channel,
                 PulseSaw_8580,
                 (value ^ (value & 0x800000 ? 0xffffff : 0)) >> 11,
@@ -321,7 +323,7 @@ export function createSID(
             }
           } else if (wf & Bitmask.SAW) {
             //pulse+saw
-            wfout[0] = combinedWaveForm(num, channel, PulseSaw_8580, phase >> 4, 1);
+            wfout[0] = combinedWaveForm(is6581, channel, PulseSaw_8580, phase >> 4, 1);
           }
         } else {
           wfout[0] = 0;
@@ -338,7 +340,7 @@ export function createSID(
         //But for deep sounds the sawtooth is really close to a sawtooth, as there is no aliasing there, but deep sounds should be sharp...
         if (wf & Bitmask.TRI) {
           //saw+triangle
-          wfout[0] = combinedWaveForm(num, channel, TriSaw_8580, wfout[0] >> 4, 1);
+          wfout[0] = combinedWaveForm(is6581, channel, TriSaw_8580, wfout[0] >> 4, 1);
         } else {
           //simple cleaned (bandlimited) saw
           const step = accuadd / 0x1200000;
@@ -363,9 +365,9 @@ export function createSID(
       //routing the channel signal to either the filter or the unfiltered master output depending on filter-switch SID-registers
       const channelOutput = (wfout[0] - 0x8000) * (envcnt[channel] * ENV_SCALE);
       if (filterRoute & (1 << voiceIndex)) {
-        filtin[0] += channelOutput;
+        filtinValue += channelOutput;
       } else if (voiceIndex !== 2 || !(volumeFilter & Bitmask.OFF3)) {
-        output[0] += channelOutput;
+        outputValue += channelOutput;
       }
     }
 
@@ -380,48 +382,49 @@ export function createSID(
     const filterCutoffLo = memory[SIDaddr + 0x15];
     const filterCutoffHi = memory[SIDaddr + 0x16];
     const filterKey =
-      (filterCutoffLo & 7) |
-      (filterCutoffHi << 3) |
-      (filterRoute << 11) |
-      ((SID_model[num] === 8580 ? 1 : 0) << 19);
+      (filterCutoffLo & 7) | (filterCutoffHi << 3) | (filterRoute << 11) | ((is8580 ? 1 : 0) << 19);
     if (filterCacheKey[num] !== filterKey) {
       filterCacheKey[num] = filterKey;
-      const cutoffValue = (filterCutoffLo & 7) / 8 + filterCutoffHi + 0.2;
-      if (SID_model[num] === 8580) {
-        cutoff[0] = 1 - Math.exp(cutoffValue * cutoff_ratio_8580);
+      const cutoffInput = (filterCutoffLo & 7) / 8 + filterCutoffHi + 0.2;
+      if (is8580) {
+        cutoff[0] = 1 - Math.exp(cutoffInput * cutoff_ratio_8580);
         resonance[0] = 2 ** ((4 - (filterRoute >> 4)) / 8);
       } else {
         cutoff[0] =
-          cutoffValue < 24 ? 0.035 : 1 - 1.263 * Math.exp(cutoffValue * cutoff_ratio_6581);
+          cutoffInput < 24 ? 0.035 : 1 - 1.263 * Math.exp(cutoffInput * cutoff_ratio_6581);
         resonance[0] = filterRoute > 0x5f ? 8 / (filterRoute >> 4) : 1.41;
       }
     }
-    let filterValue = filtin[0] + prevbandpass[num] * resonance[0] + prevlowpass[num];
-    if (volumeFilter & Bitmask.HIGHPASS) output[0] -= filterValue;
-    filterValue = prevbandpass[num] - filterValue * cutoff[0];
+    const cutoffValue = cutoff[0];
+    const resonanceValue = resonance[0];
+    let filterValue = filtinValue + prevbandpass[num] * resonanceValue + prevlowpass[num];
+    if (volumeFilter & Bitmask.HIGHPASS) outputValue -= filterValue;
+    filterValue = prevbandpass[num] - filterValue * cutoffValue;
     prevbandpass[num] = filterValue;
-    if (volumeFilter & Bitmask.BANDPASS) output[0] -= filterValue;
-    filterValue = prevlowpass[num] + filterValue * cutoff[0];
+    if (volumeFilter & Bitmask.BANDPASS) outputValue -= filterValue;
+    filterValue = prevlowpass[num] + filterValue * cutoffValue;
     prevlowpass[num] = filterValue;
-    if (volumeFilter & Bitmask.LOWPASS) output[0] += filterValue;
+    if (volumeFilter & Bitmask.LOWPASS) outputValue += filterValue;
+    filtin[0] = filtinValue;
+    output[0] = outputValue;
 
     //when it comes to $D418 volume-register digi playback, I made an AC / DC separation for $D418 value in the SwinSID at low (20Hz or so) cutoff-frequency,
     //and sent the AC (highpass) value to a 4th 'digi' channel mixed to the master output, and set ONLY the DC (lowpass) value to the volume-control.
     //This solved 2 issues: Thanks to the lowpass filtering of the volume-control, SID tunes where digi is played together with normal SID channels,
     //won't sound distorted anymore, and the volume-clicks disappear when setting SID-volume. (This is useful for fade-in/out tunes like Hades Nebula, where clicking ruins the intro.)
-    return (output[0] / OUTPUT_SCALEDOWN) * (volumeFilter & 0xf);
+    return (outputValue / OUTPUT_SCALEDOWN) * (volumeFilter & 0xf);
     // SID output
   }
 
   function combinedWaveForm(
-    num: number,
+    is6581: boolean,
     channel: number,
     waveform: Int32Array,
     index: number,
     differ6581: 0 | 1,
   ) {
     //on 6581 most combined waveforms are essentially halved 8580-like waves
-    if (differ6581 && SID_model[num] === 6581) index &= 0x7ff;
+    if (differ6581 && is6581) index &= 0x7ff;
     const combiwf = (waveform[index] + prevwavdata[channel]) / 2;
     prevwavdata[channel] = waveform[index];
     return combiwf;
