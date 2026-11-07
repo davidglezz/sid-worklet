@@ -1,0 +1,13 @@
+{
+  "name": "sid2wasm",
+  "private": true,
+  "description": "Translate C64 SID files into standalone WebAssembly CPU modules",
+  "type": "module",
+  "scripts": {
+    "build": "node src/cli.ts",
+    "test": "node --test test/*.test.ts"
+  },
+  "dependencies": {
+    "wabt": "^1.0.39"
+  }
+}
