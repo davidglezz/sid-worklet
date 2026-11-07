@@ -227,6 +227,7 @@ function createSongLink(song: Song): HTMLAnchorElement {
 }
 
 async function displaySongList() {
+  const generation = ++renderGeneration;
   songList = [];
   songIndex.clear();
   parts.songlist.innerHTML = '';
@@ -236,7 +237,6 @@ async function displaySongList() {
     songIndex.set(song.relativeUrl, song);
   }
 
-  const generation = ++renderGeneration;
   void renderSongList(songList, generation)
     .catch(showError)
     .finally(() => {
