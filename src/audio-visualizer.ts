@@ -30,7 +30,7 @@ export class AudioVisualizer {
   sinewave() {
     cancelAnimationFrame(this.rafHandle);
     this.activeVisualizer = 'sinewave';
-    const color = getComputedStyle(document.body).getPropertyValue('--fg-color');
+    const color = getForegroundColor();
     const bufferLength = (this.analyser.fftSize = 512);
     const dataArray = new Uint8Array(bufferLength);
     const draw = () => {
@@ -55,8 +55,7 @@ export class AudioVisualizer {
   frequencybars() {
     cancelAnimationFrame(this.rafHandle);
     this.activeVisualizer = 'frequencybars';
-    const color = getComputedStyle(document.body).getPropertyValue('--fg-color');
-    const [, r, g, b] = color.split(/[^\d.]+/g);
+    const color = getForegroundColor();
     this.analyser.fftSize = 128;
     const bufferLength = this.analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
@@ -65,9 +64,10 @@ export class AudioVisualizer {
       this.rafHandle = requestAnimationFrame(draw);
       this.analyser.getByteFrequencyData(dataArray);
       this.canvasCtx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+      this.canvasCtx.fillStyle = color;
       for (let i = 0; i < bufferLength; i++) {
         const v = easeInOutQuad(dataArray[i] / 255);
-        this.canvasCtx.fillStyle = `rgba(${r}, ${g}, ${b}, ${v})`;
+        this.canvasCtx.globalAlpha = v;
         const barHeight = v * this.canvas.height;
         this.canvasCtx.fillRect(
           i * barWidth,
@@ -76,6 +76,7 @@ export class AudioVisualizer {
           barHeight,
         );
       }
+      this.canvasCtx.globalAlpha = 1;
     };
     draw();
   }
@@ -94,6 +95,10 @@ export class AudioVisualizer {
     } as const;
     this[next[this.activeVisualizer]]();
   }
+}
+
+function getForegroundColor(): string {
+  return getComputedStyle(document.body).getPropertyValue('--fg-color').trim() || '#fff';
 }
 
 function easeInOutQuad(x: number): number {
