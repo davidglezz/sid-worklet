@@ -1,6 +1,7 @@
 // Based on work jsSID by Hermit (Mihaly Horvath) : https://github.com/og2t/jsSID
 
 import { createCPU } from './cpu.ts';
+import { copySidImage, parseSidHeader } from './sid-header.ts';
 import { createSID } from './sid-device.ts';
 
 //emulated machine constants
@@ -86,21 +87,12 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
     subtune = subt;
     const filedata = new Uint8Array(data);
     //SID-file format information can be found at HVSC
-    const offs = filedata[7];
-    loadaddr =
-      filedata[8] + filedata[9]
-        ? filedata[8] * 256 + filedata[9]
-        : filedata[offs] + filedata[offs + 1] * 256;
+    const header = parseSidHeader(filedata);
+    loadaddr = header.loadAddress;
     for (let i = 0; i < 32; i++)
       timermode[31 - i] = filedata[0x12 + (i >> 3)] & (2 ** (7 - (i % 8)));
     memory.fill(0);
-    for (
-      let i = offs + 2, addr = loadaddr;
-      i < filedata.byteLength && addr < memory.length;
-      i++, addr++
-    ) {
-      memory[addr] = filedata[i];
-    }
+    copySidImage(filedata, header, memory);
     title = getString(filedata, 0x16);
     author = getString(filedata, 0x36);
     info = getString(filedata, 0x56);
