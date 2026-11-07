@@ -46,6 +46,10 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
   const SID = createSID(memory, samplerate, clk_ratio, SID_model);
 
   const CHECKPOINT_INTERVAL = 30; // seconds
+  // Worst case 16 minutes of seek history (32 checkpoints x 30 s) with all
+  // 64 KiB memory snapshots preallocated, so checkpoints never allocate in
+  // the audio callback.
+  const MAX_CHECKPOINTS = 32;
 
   interface Checkpoint {
     playtime: number;
@@ -62,6 +66,15 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
   }
 
   let checkpoints: Checkpoint[] = [];
+  const checkpointPool: Uint8Array[] = [];
+  let nextCheckpointTime = CHECKPOINT_INTERVAL;
+
+  function ensureCheckpointPool() {
+    if (checkpointPool.length === MAX_CHECKPOINTS) return;
+    for (let i = checkpointPool.length; i < MAX_CHECKPOINTS; i++) {
+      checkpointPool.push(new Uint8Array(memory.length));
+    }
+  }
 
   function unload() {
     loaded = 0;
@@ -108,6 +121,7 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
     SIDamount = 0;
     if (SID_address[1] > 0) SIDamount++;
     if (SID_address[2] > 0) SIDamount++;
+    ensureCheckpointPool();
     loaded = 1;
     init(subtune);
   }
@@ -150,6 +164,7 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
       playtime = 0;
       ended = 0;
       checkpoints = [];
+      nextCheckpointTime = CHECKPOINT_INTERVAL;
       initialized = 1;
     }
   }
@@ -198,13 +213,20 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
     if (SID_address[1]) mix += SID.emulate(1, SID_address[1]);
     if (SID_address[2]) mix += SID.emulate(2, SID_address[2]);
 
-    // Save a checkpoint at each CHECKPOINT_INTERVAL boundary.
-    if (Math.floor(playtime / CHECKPOINT_INTERVAL) > checkpoints.length - 1) {
+    // Save a checkpoint at each CHECKPOINT_INTERVAL boundary, reusing the
+    // preallocated memory buffers so the audio callback never allocates 64 KiB.
+    if (playtime >= nextCheckpointTime) {
+      nextCheckpointTime += CHECKPOINT_INTERVAL;
+      const snapshot =
+        checkpoints.length < MAX_CHECKPOINTS
+          ? checkpointPool[checkpoints.length]!
+          : checkpoints.shift()!.memory;
+      snapshot.set(memory);
       checkpoints.push({
         playtime,
         cpu: CPU.getState(),
         sid: SID.getState(),
-        memory: new Uint8Array(memory),
+        memory: snapshot,
         CPUtime,
         framecnt,
         frame_sampleperiod,
@@ -247,6 +269,7 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
       startSamples = 0;
     }
 
+    nextCheckpointTime = (Math.floor(playtime / CHECKPOINT_INTERVAL) + 1) * CHECKPOINT_INTERVAL;
     const targetSamples = Math.floor(targetSeconds * samplerate);
     for (let i = startSamples; i < targetSamples; i++) {
       play();
