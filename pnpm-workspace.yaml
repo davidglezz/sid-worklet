@@ -1,3 +1,5 @@
+packages:
+  - sid2wasm
 overrides:
   vite@*: 'catalog:'
   vitest@*: 'catalog:'
