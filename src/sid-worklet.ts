@@ -37,14 +37,7 @@ type Id<T extends object, R = { [ID in keyof T]: { id: ID } & T[ID] }[keyof T]> 
 export type InputMessages = Id<InputMessagesMap>;
 export type OutputMessages = Id<OutputMessagesMap>;
 
-type MessageHandler<T = InputMessagesMap> = {
-  [ID in keyof T]: (params: T[ID]) => void;
-};
-
-class SIDProcessor
-  extends AudioWorkletProcessor
-  implements AudioWorkletProcessorImpl, MessageHandler
-{
+class SIDProcessor extends AudioWorkletProcessor implements AudioWorkletProcessorImpl {
   sid = SIDPlayer(/*sampleRate*/);
   /** Pending seek target in seconds; null if no seek is queued (last-wins). */
   private pendingSeek: number | null = null;
@@ -58,17 +51,35 @@ class SIDProcessor
   constructor() {
     super();
     this.port.onmessage = (ev: MessageEvent<InputMessages>) => {
-      const { id, ...params } = ev.data;
-      // @ts-expect-error - Params depends on the message id
-      this[id]?.(params);
+      const message = ev.data;
+      switch (message.id) {
+        case 'load':
+          this.load(message);
+          break;
+        case 'setPosition':
+          this.setPosition(message);
+          break;
+        case 'setSubsong':
+          this.setSubsong(message);
+          break;
+        case 'setDuration':
+          this.setDuration(message);
+          break;
+        default:
+          this.port.postMessage({
+            id: 'log',
+            severity: 'warn',
+            message: `Unknown message: ${String((message as { id: unknown }).id)}`,
+          });
+      }
     };
   }
 
   process(_input: never, outputs: Float32Array[][], _params: never): boolean {
     const output = outputs[0];
-    const length = output[0].length;
     const left = output[0];
-    const right = output[1];
+    const length = left.length;
+    const right = output.length > 1 ? output[1] : left;
 
     // Apply pending seek (last-wins) before producing samples.
     if (this.pendingSeek !== null) {
@@ -118,7 +129,7 @@ class SIDProcessor
   }
 
   setDuration({ value }: InputMessagesMap['setDuration']) {
-    this.duration = value;
+    this.duration = Number.isFinite(value) ? Math.max(0, value) : 0;
   }
 
   getSongInfo(): SongInfo {
