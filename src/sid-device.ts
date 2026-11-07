@@ -39,7 +39,7 @@ const ADSR_exptable = [
 ];
 
 // Waveforms
-function createCombineWaveForm(bitmul: number, bitstrength: number, treshold: number) {
+function createCombineWaveForm(bitmul: number, bitstrength: number, threshold: number) {
   const waveform = new Int32Array(4096);
   const attenuation = Array.from({ length: 12 }, (_, j) =>
     Array.from({ length: 12 }, (_, k) => bitmul / bitstrength ** Math.abs(k - j)),
@@ -47,13 +47,13 @@ function createCombineWaveForm(bitmul: number, bitstrength: number, treshold: nu
   // Neighboring bits affect each other recursively
   for (let i = 0; i < 4096; i++) {
     let value = 0;
-    //neighbour-bit strength and DAC MOSFET treshold is approximately set by ears'n'trials
+    //neighbour-bit strength and DAC MOSFET threshold is approximately set by ears'n'trials
     for (let j = 0; j < 12; j++) {
       let bitlevel = 0;
       for (let k = 0; k < 12; k++) {
         bitlevel += attenuation[j][k] * (((i >> k) & 1) - 0.5);
       }
-      value += bitlevel >= treshold ? 2 ** j : 0;
+      value += bitlevel >= threshold ? 2 ** j : 0;
     }
     waveform[i] = value * 12;
   }
@@ -378,7 +378,7 @@ export function createSID(
 
     //FILTER: two integrator loop bi-quadratic filter, workings learned from resid code, but I kindof simplified the equations
     //The phases of lowpass and highpass outputs are inverted compared to the input, but bandpass IS in phase with the input signal.
-    //The 8580 cutoff frequency control-curve is ideal, while the 6581 has a treshold, and below it it outputs a constant lowpass frequency.
+    //The 8580 cutoff frequency control-curve is ideal, while the 6581 has a threshold, and below it it outputs a constant lowpass frequency.
     const filterCutoffLo = memory[SIDaddr + 0x15];
     const filterCutoffHi = memory[SIDaddr + 0x16];
     const filterKey =
