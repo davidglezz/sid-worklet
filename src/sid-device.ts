@@ -129,6 +129,9 @@ export function createSID(
   noise_LFSR.fill(0x7ffff8);
   const cutoff_ratio_8580 = (-2 * 3.14 * (12500 / 256)) / samplerate;
   const cutoff_ratio_6581 = (-2 * 3.14 * (20000 / 256)) / samplerate;
+  // Filter coefficients only depend on $D415/$D416/$D417 and the SID model.
+  // Cache the last key per SID chip so Math.exp/pow are not paid every sample.
+  const filterCacheKey = new Int32Array(3).fill(-1);
 
   function init() {
     for (let i = 0xd400; i <= 0xd7ff; i++) memory[i] = 0;
@@ -137,6 +140,7 @@ export function createSID(
       ADSRstate[i] = Bitmask.HOLDZERO;
       ratecnt[i] = envcnt[i] = expcnt[i] = prevSR[i] = 0;
     }
+    filterCacheKey.fill(-1);
   }
 
   function emulate(num: number, SIDaddr: number) {
@@ -376,13 +380,22 @@ export function createSID(
     //The 8580 cutoff frequency control-curve is ideal, while the 6581 has a treshold, and below it it outputs a constant lowpass frequency.
     const filterCutoffLo = memory[SIDaddr + 0x15];
     const filterCutoffHi = memory[SIDaddr + 0x16];
-    cutoff[0] = (filterCutoffLo & 7) / 8 + filterCutoffHi + 0.2;
-    if (SID_model[num] === 8580) {
-      cutoff[0] = 1 - Math.exp(cutoff[0] * cutoff_ratio_8580);
-      resonance[0] = 2 ** ((4 - (filterRoute >> 4)) / 8);
-    } else {
-      cutoff[0] = cutoff[0] < 24 ? 0.035 : 1 - 1.263 * Math.exp(cutoff[0] * cutoff_ratio_6581);
-      resonance[0] = filterRoute > 0x5f ? 8 / (filterRoute >> 4) : 1.41;
+    const filterKey =
+      (filterCutoffLo & 7) |
+      (filterCutoffHi << 3) |
+      (filterRoute << 11) |
+      ((SID_model[num] === 8580 ? 1 : 0) << 19);
+    if (filterCacheKey[num] !== filterKey) {
+      filterCacheKey[num] = filterKey;
+      const cutoffValue = (filterCutoffLo & 7) / 8 + filterCutoffHi + 0.2;
+      if (SID_model[num] === 8580) {
+        cutoff[0] = 1 - Math.exp(cutoffValue * cutoff_ratio_8580);
+        resonance[0] = 2 ** ((4 - (filterRoute >> 4)) / 8);
+      } else {
+        cutoff[0] =
+          cutoffValue < 24 ? 0.035 : 1 - 1.263 * Math.exp(cutoffValue * cutoff_ratio_6581);
+        resonance[0] = filterRoute > 0x5f ? 8 / (filterRoute >> 4) : 1.41;
+      }
     }
     let filterValue = filtin[0] + prevbandpass[num] * resonance[0] + prevlowpass[num];
     if (volumeFilter & Bitmask.HIGHPASS) output[0] -= filterValue;
@@ -424,6 +437,8 @@ export function createSID(
       throw new RangeError('Invalid SID state buffer size');
     }
     stateBytes.set(new Uint8Array(state));
+    // Restored cutoff/resonance may have been computed from different registers.
+    filterCacheKey.fill(-1);
   }
 
   //volume range: 0..1
