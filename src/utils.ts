@@ -42,12 +42,10 @@ export function parseDuration(value: string | undefined): number {
 /**
  * Formats a duration in seconds as `MM:SS`.
  * Negative values are clamped to `00:00`.
- * @param padMinutes - Zero-pad the minutes (default true).
  */
-export function formatTime(value: number, padMinutes = true): string {
+export function formatTime(value: number): string {
   const totalSeconds = Math.max(0, Math.floor(value));
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
-  const minutesText = padMinutes ? String(minutes).padStart(2, '0') : String(minutes);
-  return `${minutesText}:${String(seconds).padStart(2, '0')}`;
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }

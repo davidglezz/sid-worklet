@@ -223,7 +223,6 @@ function createSongLink(song: Song): HTMLAnchorElement {
     song.durations.length > 1
       ? `${song.durations.length} subsongs · ${formatTime(
           song.durations.reduce((sum, d) => sum + parseDuration(d), 0),
-          false,
         )}`
       : (song.durations[0] ?? '');
   const durationSpan = document.createElement('span');

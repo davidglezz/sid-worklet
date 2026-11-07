@@ -139,12 +139,6 @@ describe('formatTime', () => {
   it('pads single-digit minutes and seconds', () => {
     expect(formatTime(65)).toBe('01:05');
   });
-
-  it('can omit the minutes padding', () => {
-    expect(formatTime(0, false)).toBe('0:00');
-    expect(formatTime(65, false)).toBe('1:05');
-    expect(formatTime(359, false)).toBe('5:59');
-  });
 });
 
 // ---------------------------------------------------------------------------
