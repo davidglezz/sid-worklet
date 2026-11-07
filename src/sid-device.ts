@@ -40,7 +40,7 @@ const ADSR_exptable = [
 
 // Waveforms
 function createCombineWaveForm(bitmul: number, bitstrength: number, treshold: number) {
-  const waveform = Array.from<number>({ length: 4096 });
+  const waveform = new Int32Array(4096);
   const attenuation = Array.from({ length: 12 }, (_, j) =>
     Array.from({ length: 12 }, (_, k) => bitmul / bitstrength ** Math.abs(k - j)),
   );
@@ -75,7 +75,6 @@ export function createSID(
   ADSRstep[0] = Math.ceil(ADSRperiods[0] / 9);
 
   //SID emulation constants
-  const FILTSW = [1, 2, 4, 1, 2, 4, 1, 2, 4] as const;
   const channelStateLength = SID_CHANNEL_AMOUNT * 3;
   const sidStateLength = 3;
   //SID emulation variables
@@ -363,7 +362,7 @@ export function createSID(
 
       //routing the channel signal to either the filter or the unfiltered master output depending on filter-switch SID-registers
       const channelOutput = (wfout[0] - 0x8000) * (envcnt[channel] * ENV_SCALE);
-      if (filterRoute & FILTSW[channel]) {
+      if (filterRoute & (1 << voiceIndex)) {
         filtin[0] += channelOutput;
       } else if (voiceIndex !== 2 || !(volumeFilter & Bitmask.OFF3)) {
         output[0] += channelOutput;
@@ -417,7 +416,7 @@ export function createSID(
   function combinedWaveForm(
     num: number,
     channel: number,
-    waveform: number[],
+    waveform: Int32Array,
     index: number,
     differ6581: 0 | 1,
   ) {
