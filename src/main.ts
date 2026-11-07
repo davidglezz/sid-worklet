@@ -23,6 +23,7 @@ let songList: Song[] = [];
 const songIndex = new Map<string, Song>();
 let currentSongName = '';
 let currentSongLink: HTMLAnchorElement | null = null;
+let renderGeneration = 0;
 
 const player = new AudioPlayer();
 const visualizer = new AudioVisualizer(player.context, parts.visualizer, 'sinewave');
@@ -229,21 +230,38 @@ async function displaySongList() {
   songList = [];
   songIndex.clear();
   parts.songlist.innerHTML = '';
-  let currentPath = '';
-  let currentSection: HTMLElement | null = null;
 
   for await (const song of streamSongList()) {
     songList.push(song);
     songIndex.set(song.relativeUrl, song);
+  }
+
+  const generation = ++renderGeneration;
+  void renderSongList(songList, generation)
+    .catch(showError)
+    .finally(() => {
+      if (generation === renderGeneration) {
+        parts.songlist.removeAttribute('aria-busy');
+      }
+    });
+}
+
+async function renderSongList(songs: Song[], generation: number) {
+  parts.songlist.setAttribute('aria-busy', 'true');
+  let currentPath = '';
+  let currentSection: HTMLElement | null = null;
+  let lastYield = performance.now();
+
+  for (const song of songs) {
+    if (generation !== renderGeneration) return;
 
     if (song.path !== currentPath) {
       currentPath = song.path;
       currentSection = document.createElement('section');
-      parts.songlist.appendChild(currentSection);
-
       const title = document.createElement('h3');
       title.textContent = currentPath;
       currentSection.appendChild(title);
+      parts.songlist.appendChild(currentSection);
     }
 
     const link = createSongLink(song);
@@ -252,6 +270,13 @@ async function displaySongList() {
       link.classList.add('active');
     }
     currentSection?.appendChild(link);
+
+    // Yield to the event loop every ~8 ms so scrolling and playback stay
+    // responsive while the ~60k-entry list is built.
+    if (performance.now() - lastYield >= 8) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      lastYield = performance.now();
+    }
   }
 }
 
