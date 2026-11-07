@@ -61,7 +61,6 @@ player.on('songInfo', ({ songInfo }) => {
     parts.position.max = `${getCurrentDuration()}`;
   }
   updateTimeIndicator();
-  console.log(songInfo); // eslint-disable-line no-console
 });
 player.on('error', ({ error }: PlayerErrorEvent) => showError(error));
 parts.visualizer.onclick = () => visualizer.next();
