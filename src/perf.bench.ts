@@ -1,4 +1,4 @@
-import { bench, describe } from 'vitest';
+import { test, describe } from 'vitest';
 import { createCPU } from './cpu';
 import { createCPU as createCPUBaseline } from './__bench__/cpu-baseline';
 import { createSID } from './sid-device';
@@ -43,16 +43,20 @@ describe('CPU Benchmark', () => {
   const { cpu: currentCpu } = setupCPU(createCPU);
   const { cpu: baselineCpu } = setupCPU(createCPUBaseline);
 
-  bench('current cpu', () => {
-    for (let i = 0; i < CPU_TICKS; i++) {
-      currentCpu.tick();
-    }
+  test('current cpu', async ({ bench }) => {
+    await bench('current cpu', () => {
+      for (let i = 0; i < CPU_TICKS; i++) {
+        currentCpu.tick();
+      }
+    }).run();
   });
 
-  bench('baseline cpu', () => {
-    for (let i = 0; i < CPU_TICKS; i++) {
-      baselineCpu.tick();
-    }
+  test('baseline cpu', async ({ bench }) => {
+    await bench('baseline cpu', () => {
+      for (let i = 0; i < CPU_TICKS; i++) {
+        baselineCpu.tick();
+      }
+    }).run();
   });
 });
 
@@ -60,15 +64,19 @@ describe('SID Benchmark', () => {
   const { sid: currentSid, base } = setupSID(createSID);
   const { sid: baselineSid } = setupSID(createSIDBaseline);
 
-  bench('current sid', () => {
-    for (let i = 0; i < SID_CALLS; i++) {
-      currentSid.emulate(0, base);
-    }
+  test('current sid', async ({ bench }) => {
+    await bench('current sid', () => {
+      for (let i = 0; i < SID_CALLS; i++) {
+        currentSid.emulate(0, base);
+      }
+    }).run();
   });
 
-  bench('baseline sid', () => {
-    for (let i = 0; i < SID_CALLS; i++) {
-      baselineSid.emulate(0, base);
-    }
+  test('baseline sid', async ({ bench }) => {
+    await bench('baseline sid', () => {
+      for (let i = 0; i < SID_CALLS; i++) {
+        baselineSid.emulate(0, base);
+      }
+    }).run();
   });
 });

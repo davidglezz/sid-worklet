@@ -18,21 +18,15 @@
     "bench": "vp test bench"
   },
   "dependencies": {
-    "vitest": "npm:@voidzero-dev/vite-plus-test@^0.1.19"
+    "vitest": "catalog:"
   },
   "devDependencies": {
     "@types/audioworklet": "^0.0.54",
     "@types/node": "^24.12.2",
-    "@vitest/coverage-v8": "^2.1.9",
+    "@vitest/coverage-v8": "catalog:",
     "typescript": "^6.0.3",
-    "vite": "npm:@voidzero-dev/vite-plus-core@^0.1.19",
-    "vite-plus": "latest"
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
   },
-  "packageManager": "pnpm@10.33.0",
-  "pnpm": {
-    "overrides": {
-      "vite": "npm:@voidzero-dev/vite-plus-core@latest",
-      "vitest": "npm:@voidzero-dev/vite-plus-test@latest"
-    }
-  }
+  "packageManager": "pnpm@10.33.0"
 }

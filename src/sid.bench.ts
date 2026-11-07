@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { readFileSync } from 'node:fs';
 import type { Buffer } from 'node:buffer';
-import { bench, describe } from 'vitest';
+import { test, describe } from 'vitest';
 import { SIDPlayer as SIDPlayerCurrent } from './sid.ts';
 import { SIDPlayer as SIDPlayerBaseline } from './__bench__/sid-baseline.ts';
 // @ts-ignore - This is the reference implementation in JavaScript.
@@ -64,17 +64,32 @@ function runSongReference(song: string) {
 
 describe('SID songs benchmark (real test songs)', () => {
   for (const song of SONGS) {
-    bench(`current ${song}`, () => {
-      runSong(SIDPlayerCurrent, song);
-    });
+    {
+      const _benchName = `current ${song}`;
+      test(_benchName, async ({ bench }) => {
+        await bench(_benchName, () => {
+          runSong(SIDPlayerCurrent, song);
+        }).run();
+      });
+    }
 
-    bench(`baseline ${song}`, () => {
-      runSong(SIDPlayerBaseline, song);
-    });
+    {
+      const _benchName2 = `baseline ${song}`;
+      test(_benchName2, async ({ bench }) => {
+        await bench(_benchName2, () => {
+          runSong(SIDPlayerBaseline, song);
+        }).run();
+      });
+    }
 
-    bench(`reference ${song}`, () => {
-      runSongReference(song);
-    });
+    {
+      const _benchName3 = `reference ${song}`;
+      test(_benchName3, async ({ bench }) => {
+        await bench(_benchName3, () => {
+          runSongReference(song);
+        }).run();
+      });
+    }
   }
 });
 
