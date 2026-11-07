@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { SIDPlayer } from './sid.ts';
 import { copySidImage, parseSidHeader } from './sid-header.ts';
 
 interface CreateSidOptions {
@@ -7,6 +8,8 @@ interface CreateSidOptions {
   headerLoadAddress?: number;
   dataLoadAddress?: number;
   image?: number[];
+  songs?: number;
+  startSong?: number;
 }
 
 function createSid(options: CreateSidOptions = {}): Uint8Array {
@@ -25,8 +28,8 @@ function createSid(options: CreateSidOptions = {}): Uint8Array {
   writeU16BE(buffer, 0x08, headerLoadAddress);
   writeU16BE(buffer, 0x0a, dataLoadAddress);
   writeU16BE(buffer, 0x0c, 0);
-  writeU16BE(buffer, 0x0e, 1);
-  writeU16BE(buffer, 0x10, 1);
+  writeU16BE(buffer, 0x0e, options.songs ?? 1);
+  writeU16BE(buffer, 0x10, options.startSong ?? 1);
   buffer.set(prefix, dataOffset);
   buffer.set(image, dataOffset + prefix.length);
   return buffer;
@@ -44,6 +47,8 @@ describe('parseSidHeader', () => {
       dataOffset: 0x7c,
       loadAddress: 0x1000,
       dataStart: 0x7e,
+      songs: 1,
+      startSong: 1,
     });
   });
 
@@ -53,6 +58,8 @@ describe('parseSidHeader', () => {
       dataOffset: 0x7c,
       loadAddress: 0x2000,
       dataStart: 0x7c,
+      songs: 1,
+      startSong: 1,
     });
   });
 
@@ -61,6 +68,18 @@ describe('parseSidHeader', () => {
     const header = parseSidHeader(sid);
     expect(header.dataOffset).toBe(0x100);
     expect(header.dataStart).toBe(0x102);
+  });
+
+  it('reads the 16-bit song count and preferred start song', () => {
+    const header = parseSidHeader(createSid({ songs: 0x0102, startSong: 2 }));
+    expect(header.songs).toBe(0x0102);
+    expect(header.startSong).toBe(2);
+  });
+
+  it('defaults a zero song count and start song to one', () => {
+    const header = parseSidHeader(createSid({ songs: 0, startSong: 0 }));
+    expect(header.songs).toBe(1);
+    expect(header.startSong).toBe(1);
   });
 
   it('rejects files with an invalid magic', () => {
@@ -109,5 +128,39 @@ describe('copySidImage', () => {
     copySidImage(sid, parseSidHeader(sid), memory);
     expect(memory[0xfffe]).toBe(0xaa);
     expect(memory[0xffff]).toBe(0xbb);
+  });
+});
+
+describe('SIDPlayer header usage', () => {
+  const sampleRate = 44100;
+
+  function createPlayableSid(): Uint8Array {
+    // Init routine is a single RTS at $1000, so load() returns immediately.
+    return createSid({
+      headerLoadAddress: 0x1000,
+      dataLoadAddress: 0x1000,
+      image: [0x60],
+      songs: 2,
+      startSong: 2,
+    });
+  }
+
+  it('starts at the preferred start song', () => {
+    const sid = SIDPlayer(sampleRate);
+    sid.load(createPlayableSid().buffer as ArrayBuffer);
+    expect(sid.subtune).toBe(1);
+    expect(sid.subtunes).toBe(2);
+  });
+
+  it('clamps explicit subtune indexes', () => {
+    const sid = SIDPlayer(sampleRate);
+    sid.load(createPlayableSid().buffer as ArrayBuffer, 0);
+    expect(sid.subtune).toBe(0);
+
+    sid.init(99);
+    expect(sid.subtune).toBe(1);
+
+    sid.init(-1);
+    expect(sid.subtune).toBe(0);
   });
 });

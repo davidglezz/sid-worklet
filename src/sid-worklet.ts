@@ -102,7 +102,7 @@ class SIDProcessor
   }
 
   load({ songData }: InputMessagesMap['load']) {
-    this.sid.load(songData, 0);
+    this.sid.load(songData);
     this.port.postMessage({ id: 'songInfo', songInfo: this.getSongInfo() });
     this.port.postMessage({ id: 'position', value: 0 });
   }

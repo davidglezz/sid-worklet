@@ -6,6 +6,10 @@ export interface SidHeader {
   loadAddress: number;
   /** Offset in the source where the image bytes begin. */
   dataStart: number;
+  /** Number of subsongs (at least 1). */
+  songs: number;
+  /** Preferred start song, 1-based as stored in the header. */
+  startSong: number;
 }
 
 const HEADER_SIZE = 0x7c;
@@ -44,7 +48,10 @@ export function parseSidHeader(source: Uint8Array): SidHeader {
     throw new Error('SID file does not contain image data');
   }
 
-  return { dataOffset, loadAddress, dataStart };
+  const songs = readU16BE(source, 0x0e) || 1;
+  const startSong = readU16BE(source, 0x10) || 1;
+
+  return { dataOffset, loadAddress, dataStart, songs, startSong };
 }
 
 /** Copy the image bytes from `source` into the 64 KiB C64 address space. */

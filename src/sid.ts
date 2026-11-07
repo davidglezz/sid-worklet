@@ -9,6 +9,12 @@ const C64_PAL_CPUCLK = 985248; //Hz
 const PAL_FRAMERATE = 50; //NTSC_FRAMERATE = 60;
 const SIDamount_vol = [1, 0.6, 0.4]; //how much to attenuate with more 2SID/3SID to avoid master-output overflows
 
+function clampSubtune(value: number, count: number): number {
+  const index = Math.floor(value);
+  const max = Math.max(0, count - 1);
+  return Number.isFinite(index) ? Math.min(Math.max(index, 0), max) : 0;
+}
+
 export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
   const clk_ratio = C64_PAL_CPUCLK / samplerate;
   const samplePeriod = 1 / samplerate;
@@ -83,11 +89,12 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
     SID.init();
   }
 
-  function load(data: ArrayBuffer | SharedArrayBuffer, subt = 0) {
-    subtune = subt;
+  function load(data: ArrayBuffer | SharedArrayBuffer, subt?: number) {
     const filedata = new Uint8Array(data);
     //SID-file format information can be found at HVSC
     const header = parseSidHeader(filedata);
+    subtune_amount = header.songs;
+    subtune = clampSubtune(subt ?? header.startSong - 1, header.songs);
     loadaddr = header.loadAddress;
     for (let i = 0; i < 32; i++)
       timermode[31 - i] = filedata[0x12 + (i >> 3)] & (2 ** (7 - (i % 8)));
@@ -99,7 +106,6 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
 
     initaddr = filedata[0xa] + filedata[0xb] ? filedata[0xa] * 256 + filedata[0xb] : loadaddr;
     playaddr = playaddf = filedata[0xc] * 256 + filedata[0xd];
-    subtune_amount = filedata[0xf];
     SID_model[0] = (filedata[0x77] & 0x30) >= 0x20 ? 8580 : 6581;
     SID_model[1] = (filedata[0x77] & 0xc0) >= 0x80 ? 8580 : 6581;
     SID_model[2] = (filedata[0x76] & 3) >= 3 ? 8580 : 6581;
@@ -123,7 +129,7 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
   function init(subt: number) {
     if (loaded) {
       initialized = 0;
-      subtune = subt;
+      subtune = clampSubtune(subt, subtune_amount);
       CPU.init(initaddr, subtune);
       SID.init();
       memory[1] = 0x37;
