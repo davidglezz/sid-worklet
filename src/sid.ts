@@ -245,6 +245,21 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
     return mix * volume * sidAmountVolume;
   }
 
+  /**
+   * Fill `left`/`right` with `length` mono samples.
+   *
+   * This is the batch entry point used by the AudioWorklet; it keeps the
+   * per-sample loop inside the player instead of crossing the closure boundary
+   * once per sample from the worklet.
+   */
+  function render(left: Float32Array, right: Float32Array, length: number) {
+    for (let i = 0; i < length; i++) {
+      const value = play();
+      left[i] = value;
+      right[i] = value;
+    }
+  }
+
   function seek(seconds: number) {
     if (!loaded) return;
     const targetSeconds = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
@@ -291,6 +306,7 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
     load,
     init,
     play,
+    render,
     seek,
     get playtime() {
       return playtime;

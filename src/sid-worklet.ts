@@ -78,9 +78,7 @@ class SIDProcessor
       this.samplesSinceLastPosition = 0;
     }
 
-    for (let i = 0; i < length; i++) {
-      left[i] = right[i] = this.sid.play();
-    }
+    this.sid.render(left, right, length);
 
     this.samplesSinceLastPosition += length;
     if (this.samplesSinceLastPosition >= SIDProcessor.POSITION_INTERVAL) {

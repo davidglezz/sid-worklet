@@ -35,10 +35,12 @@ for (const song of SONGS) {
   songData.set(song, toArrayBuffer(file));
 }
 
-function runSong(
-  playerFactory: (sampleRate: number) => ReturnType<typeof SIDPlayerCurrent>,
-  song: string,
-) {
+interface BenchPlayer {
+  load(data: ArrayBuffer | SharedArrayBuffer, subt?: number): void;
+  play(): number;
+}
+
+function runSong(playerFactory: (sampleRate: number) => BenchPlayer, song: string) {
   const data = songData.get(song);
   if (!data) throw new Error(`Missing song data for ${song}`);
 

@@ -216,6 +216,27 @@ describe('seek — edge cases', () => {
   }, 120_000); // up to 2 min — 31 s of emulated C64 audio takes real time
 });
 
+describe('render', () => {
+  it('matches play sample-for-sample', ({ expect }) => {
+    const sampleRate = 44100;
+    const songBytes = toArrayBuffer(readFileSync('test-songs/adsrtest.sid'));
+
+    const batch = SIDPlayer(sampleRate);
+    batch.load(songBytes);
+    const left = new Float32Array(256);
+    const right = new Float32Array(256);
+    batch.render(left, right, 256);
+
+    const single = SIDPlayer(sampleRate);
+    single.load(songBytes);
+    const expected: number[] = [];
+    for (let i = 0; i < 256; i++) expected.push(single.play());
+
+    expect(Array.from(left)).toEqual(expected);
+    expect(Array.from(right)).toEqual(expected);
+  });
+});
+
 function toArrayBuffer(buffer: Buffer<ArrayBuffer>) {
   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
 }
