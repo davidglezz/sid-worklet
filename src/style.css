@@ -173,6 +173,10 @@ button {
   overflow-y: auto;
   padding: 0 0.5rem;
 
+  section {
+    content-visibility: auto;
+  }
+
   h3 {
     position: sticky;
     top: 0;
