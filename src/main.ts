@@ -25,12 +25,22 @@ const parts = {
 const player = new AudioPlayer();
 const visualizer = new AudioVisualizer(player.context, parts.visualizer, 'sinewave');
 
+function showError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  parts.title.textContent = `⚠ ${message}`;
+  parts.title.classList.add('title--error');
+}
+
 player.on('log', ({ severity, message }: LogEvent) => console[severity](message)); // eslint-disable-line no-console
 player.on('ready', async () => {
-  player.connectVisualizer(visualizer.getNode());
-  await displaySongList();
-  const songName = location.hash.slice(1) || getRandomSong();
-  await load(songName);
+  try {
+    player.connectVisualizer(visualizer.getNode());
+    await displaySongList();
+    const songName = location.hash.slice(1) || getRandomSong();
+    await load(songName);
+  } catch (error) {
+    showError(error);
+  }
 });
 player.on('position', (e) => {
   if (!isDragging) parts.position.value = String(e.value);
@@ -50,12 +60,11 @@ player.on('songInfo', ({ songInfo }) => {
   updateTimeIndicator();
   console.log(songInfo); // eslint-disable-line no-console
 });
-player.on('error', ({ error }: PlayerErrorEvent) => {
-  parts.title.textContent = `⚠ ${error.message}`;
-  parts.title.classList.add('title--error');
-});
-parts.visualizer.onclick = async () => visualizer.next();
-parts.play.onclick = async () => player.togglePlay();
+player.on('error', ({ error }: PlayerErrorEvent) => showError(error));
+parts.visualizer.onclick = () => visualizer.next();
+parts.play.onclick = () => {
+  void player.togglePlay().catch(showError);
+};
 parts.volume.oninput = (event) => {
   const value = (event.target as HTMLInputElement).value;
   applyVolume(Number(value));
@@ -152,7 +161,9 @@ parts.position.oninput = (event) => {
     player.setPosition(seconds);
   }, 50);
 };
-window.onhashchange = () => play(location.hash.slice(1));
+window.onhashchange = () => {
+  void play(location.hash.slice(1)).catch(showError);
+};
 
 function getRandomSong(): string {
   const songs = parts.songlist.querySelectorAll<HTMLAnchorElement>('a[data-song]');
@@ -278,7 +289,7 @@ randomButton.innerHTML = '🎲'; // Dice icon
 randomButton.title = 'Play Random Song';
 parts.songlist.insertAdjacentElement('beforebegin', randomButton);
 
-randomButton.addEventListener('click', async () => {
+randomButton.addEventListener('click', () => {
   const randomSong = getRandomSong();
-  await load(randomSong);
+  void load(randomSong).catch(showError);
 });
