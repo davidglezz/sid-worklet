@@ -17,10 +17,12 @@ const parts = {
   volume: el<HTMLInputElement>('#volume'),
   volumeLabel: el<HTMLLabelElement>('[for=volume]'),
   songlist: el<HTMLDivElement>('#songlist'),
-  get currentSongLink() {
-    return this.songlist.querySelector<HTMLAnchorElement>('a.active[data-song]');
-  },
 };
+
+let songList: Song[] = [];
+const songIndex = new Map<string, Song>();
+let currentSongName = '';
+let currentSongLink: HTMLAnchorElement | null = null;
 
 const player = new AudioPlayer();
 const visualizer = new AudioVisualizer(player.context, parts.visualizer, 'sinewave');
@@ -166,8 +168,7 @@ window.onhashchange = () => {
 };
 
 function getRandomSong(): string {
-  const songs = parts.songlist.querySelectorAll<HTMLAnchorElement>('a[data-song]');
-  return songs[Math.floor(Math.random() * songs.length)]?.dataset.song ?? '';
+  return songList[Math.floor(Math.random() * songList.length)]?.relativeUrl ?? '';
 }
 
 async function load(songName: string) {
@@ -175,10 +176,13 @@ async function load(songName: string) {
     return;
   }
 
-  parts.currentSongLink?.classList.remove('active');
-  const nextSongLink = parts.songlist.querySelector(`a[data-song="${CSS.escape(songName)}"]`);
-  nextSongLink?.classList.add('active');
-  nextSongLink?.scrollIntoView({ block: 'center' });
+  currentSongName = songName;
+  currentSongLink?.classList.remove('active');
+  currentSongLink =
+    parts.songlist.querySelector<HTMLAnchorElement>(`a[data-song="${CSS.escape(songName)}"]`) ??
+    null;
+  currentSongLink?.classList.add('active');
+  currentSongLink?.scrollIntoView({ block: 'center' });
 
   parts.subsong.value = '0';
   parts.position.value = '0';
@@ -205,11 +209,33 @@ async function* streamSongList(): AsyncGenerator<Song> {
   }
 }
 
+function createSongLink(song: Song): HTMLAnchorElement {
+  const link = document.createElement('a');
+  link.dataset.song = song.relativeUrl;
+  link.dataset.duration = song.durations.join(',');
+  link.textContent = song.name.replaceAll('_', ' ');
+  link.href = `#${song.relativeUrl}`;
+  const duration =
+    song.durations.length > 1
+      ? formatTime(song.durations.reduce((sum, d) => sum + parseDuration(d), 0))
+      : (song.durations[0] ?? '');
+  const durationSpan = document.createElement('span');
+  durationSpan.textContent = duration;
+  link.appendChild(durationSpan);
+  return link;
+}
+
 async function displaySongList() {
+  songList = [];
+  songIndex.clear();
+  parts.songlist.innerHTML = '';
   let currentPath = '';
   let currentSection: HTMLElement | null = null;
 
   for await (const song of streamSongList()) {
+    songList.push(song);
+    songIndex.set(song.relativeUrl, song);
+
     if (song.path !== currentPath) {
       currentPath = song.path;
       currentSection = document.createElement('section');
@@ -220,18 +246,11 @@ async function displaySongList() {
       currentSection.appendChild(title);
     }
 
-    const link = document.createElement('a');
-    link.dataset.song = song.relativeUrl;
-    link.dataset.duration = song.durations.join(',');
-    link.textContent = song.name.replaceAll('_', ' ');
-    link.href = `#${song.relativeUrl}`;
-    const duration =
-      song.durations.length > 1
-        ? formatTime(song.durations.reduce((sum, d) => sum + parseDuration(d), 0))
-        : song.durations[0];
-    const durationSpan = document.createElement('span');
-    durationSpan.textContent = duration;
-    link.appendChild(durationSpan);
+    const link = createSongLink(song);
+    if (song.relativeUrl === currentSongName) {
+      currentSongLink = link;
+      link.classList.add('active');
+    }
     currentSection?.appendChild(link);
   }
 }
@@ -251,9 +270,8 @@ function setupSubsongSelector(count: number) {
 }
 
 function getCurrentDuration() {
-  return parseDuration(
-    (parts.currentSongLink?.dataset.duration ?? '').split(',').at(Number(parts.subsong.value)),
-  );
+  const durations = songIndex.get(currentSongName)?.durations ?? [];
+  return parseDuration(durations[Number(parts.subsong.value)]);
 }
 
 function updateTimeIndicator() {
