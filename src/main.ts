@@ -148,10 +148,14 @@ parts.subsong.onchange = () => {
 // Debounce seek so rapid scrubbing only sends the last position.
 let seekTimer: ReturnType<typeof setTimeout> | null = null;
 let isDragging = false;
-const onPointerDown = () => (isDragging = true);
+const onPointerDown = () => {
+  isDragging = true;
+};
 parts.position.addEventListener('mousedown', onPointerDown);
 parts.position.addEventListener('touchstart', onPointerDown);
-const onPointerUp = () => (isDragging = false);
+const onPointerUp = () => {
+  isDragging = false;
+};
 parts.position.addEventListener('mouseup', onPointerUp);
 parts.position.addEventListener('touchend', onPointerUp);
 parts.position.oninput = (event) => {
