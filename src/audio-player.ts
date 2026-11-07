@@ -38,6 +38,9 @@ export class AudioPlayer extends EventTarget {
       this.playerNode.on('log', ({ detail: { severity, message } }) => {
         this.dispatchEvent(new LogEvent(severity, message));
       });
+      this.playerNode.on('error', ({ detail: { message } }) => {
+        this.dispatchEvent(new PlayerErrorEvent(new Error(message)));
+      });
       this.playerNode.connect(this.gainNode);
       this.dispatchEvent(new CustomEvent('ready'));
     });

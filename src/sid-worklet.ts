@@ -28,6 +28,7 @@ export interface OutputMessagesMap {
   songInfo: { songInfo: SongInfo };
   position: { value: number };
   log: { severity: 'info' | 'warn' | 'error'; message: string };
+  error: { message: string };
 }
 
 type Id<T extends object, R = { [ID in keyof T]: { id: ID } & T[ID] }[keyof T]> = NonNullable<{
@@ -95,6 +96,7 @@ class SIDProcessor
   }
 
   setSubsong({ value }: InputMessagesMap['setSubsong']) {
+    this.pendingSeek = null;
     const index = Math.max(0, Math.floor(value));
     this.sid.init(index);
     this.port.postMessage({ id: 'songInfo', songInfo: this.getSongInfo() });
@@ -102,9 +104,17 @@ class SIDProcessor
   }
 
   load({ songData }: InputMessagesMap['load']) {
-    this.sid.load(songData);
-    this.port.postMessage({ id: 'songInfo', songInfo: this.getSongInfo() });
-    this.port.postMessage({ id: 'position', value: 0 });
+    this.pendingSeek = null;
+    try {
+      this.sid.load(songData);
+      this.port.postMessage({ id: 'songInfo', songInfo: this.getSongInfo() });
+      this.port.postMessage({ id: 'position', value: 0 });
+    } catch (error) {
+      this.port.postMessage({
+        id: 'error',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   setDuration({ value }: InputMessagesMap['setDuration']) {

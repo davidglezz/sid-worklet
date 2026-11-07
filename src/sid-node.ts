@@ -4,6 +4,7 @@ interface EventMap {
   songInfo: CustomEvent<{ songInfo: SongInfo }>;
   position: CustomEvent<{ value: number }>;
   log: CustomEvent<{ severity: 'info' | 'warn' | 'error'; message: string }>;
+  error: CustomEvent<{ message: string }>;
 }
 
 export class SIDNode extends AudioWorkletNode {
