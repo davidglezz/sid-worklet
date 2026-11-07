@@ -12,6 +12,7 @@ const parts = {
   position: el<HTMLInputElement>('#position'),
   time: el<HTMLLabelElement>('[for=position]'),
   subsong: el<HTMLSelectElement>('#subsong'),
+  subsongContainer: el<HTMLDivElement>('#subsong-container'),
   title: el<HTMLSpanElement>('#title'),
   volume: el<HTMLInputElement>('#volume'),
   volumeLabel: el<HTMLLabelElement>('[for=volume]'),
@@ -225,6 +226,8 @@ async function displaySongList() {
 }
 
 function setupSubsongSelector(count: number) {
+  const hasSubsongs = count > 1;
+  parts.subsongContainer.style.display = hasSubsongs ? '' : 'none';
   parts.subsong.innerHTML = '';
   for (let i = 0; i < count; i++) {
     const option = document.createElement('option');
@@ -232,7 +235,7 @@ function setupSubsongSelector(count: number) {
     option.textContent = `Subsong ${i + 1}`;
     parts.subsong.appendChild(option);
   }
-  parts.subsong.disabled = count <= 1;
+  parts.subsong.disabled = !hasSubsongs;
   parts.subsong.value = '0';
 }
 
