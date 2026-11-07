@@ -10,6 +10,7 @@ const SIDamount_vol = [1, 0.6, 0.4]; //how much to attenuate with more 2SID/3SID
 
 export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
   const clk_ratio = C64_PAL_CPUCLK / samplerate;
+  const samplePeriod = 1 / samplerate;
 
   let title = '';
   let author = '';
@@ -40,7 +41,7 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
   let volume = 1.0;
   let CPUtime = 0;
   let SIDamount = 0;
-  let mix = 0;
+  let sidAmountVolume = SIDamount_vol[0]!;
 
   const CPU = createCPU(memory);
   const SID = createSID(memory, samplerate, clk_ratio, SID_model);
@@ -121,6 +122,7 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
     SIDamount = 0;
     if (SID_address[1] > 0) SIDamount++;
     if (SID_address[2] > 0) SIDamount++;
+    sidAmountVolume = SIDamount_vol[SIDamount]!;
     ensureCheckpointPool();
     loaded = 1;
     init(subtune);
@@ -172,7 +174,7 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
   function play() {
     if (loaded && initialized) {
       framecnt--;
-      playtime += 1 / samplerate;
+      playtime += samplePeriod;
       if (framecnt <= 0) {
         framecnt = frame_sampleperiod;
         finished = 0;
@@ -180,25 +182,28 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
         CPU.SP = 0xff;
       }
       if (finished === 0) {
+        const timerMode = timermode[subtune];
+        const sid1 = SID_address[1];
+        const sid2 = SID_address[2];
         while (CPUtime <= clk_ratio) {
           const pPC = CPU.PC;
           if (CPU.tick() >= 0xfe) {
             finished = 1;
             break;
-          } else {
-            CPUtime += CPU.cycles;
           }
+          CPUtime += CPU.cycles;
           const PC = CPU.PC;
-          if ((memory[1] & 3) > 1 && pPC < 0xe000 && (PC === 0xea31 || PC === 0xea81)) {
+          const bank = memory[1] & 3;
+          if (bank > 1 && pPC < 0xe000 && (PC === 0xea31 || PC === 0xea81)) {
             finished = 1;
             break;
           }
-          const { addr } = CPU;
+          const addr = CPU.addr;
           //IRQ player ROM return handling
-          if ((addr === 0xdc05 || addr === 0xdc04) && memory[1] & 3 && timermode[subtune]) {
+          if ((addr === 0xdc05 || addr === 0xdc04) && bank && timerMode) {
             frame_sampleperiod = (memory[0xdc04] + memory[0xdc05] * 256) / clk_ratio;
           }
-          CPU.galwayRubiconWorkaround(SID_address[1], SID_address[2]);
+          CPU.galwayRubiconWorkaround(sid1, sid2);
           SID.whittakerPlayerWorkaround(addr);
         }
         CPUtime -= clk_ratio;
@@ -209,7 +214,7 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
       ended = 1;
       endcallback();
     }
-    mix = SID.emulate(0, 0xd400);
+    let mix = SID.emulate(0, 0xd400);
     if (SID_address[1]) mix += SID.emulate(1, SID_address[1]);
     if (SID_address[2]) mix += SID.emulate(2, SID_address[2]);
 
@@ -237,7 +242,7 @@ export function SIDPlayer(samplerate = globalThis.sampleRate ?? 44100) {
       });
     }
 
-    return mix * volume * SIDamount_vol[SIDamount];
+    return mix * volume * sidAmountVolume;
   }
 
   function seek(seconds: number) {
