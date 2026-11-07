@@ -1,11 +1,11 @@
 type VisualizerType = 'sinewave' | 'frequencybars' | 'off';
 
 export class AudioVisualizer {
-  protected canvas: HTMLCanvasElement;
-  protected canvasCtx: CanvasRenderingContext2D;
-  protected analyser: AnalyserNode;
-  protected rafHandle = 0;
-  protected activeVisualizer: VisualizerType = 'off';
+  private canvas: HTMLCanvasElement;
+  private canvasCtx: CanvasRenderingContext2D;
+  private analyser: AnalyserNode;
+  private rafHandle = 0;
+  private activeVisualizer: VisualizerType = 'off';
 
   constructor(audioCtx: AudioContext, canvas: HTMLCanvasElement, type: VisualizerType = 'off') {
     this.canvas = canvas;
