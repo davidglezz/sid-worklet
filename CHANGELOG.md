@@ -1,5 +1,47 @@
 # Changelog
 
+## [1.1.0](https://github.com/davidglezz/sid-worklet/compare/v1.0.0...v1.1.0) (2026-11-07)
+
+
+### Features
+
+* **sid2wasm:** translate SID 6502 code to WebAssembly ([1af35d3](https://github.com/davidglezz/sid-worklet/commit/1af35d387f51246905ec186cb39b4a82553f6598))
+* **ui:** show subsong selector only for multi-subsong songs ([6c98461](https://github.com/davidglezz/sid-worklet/commit/6c98461b4a3d60291738f3e9c3a597c8835710dc))
+
+
+### Bug Fixes
+
+* **audio-player:** guard operations until the worklet is ready ([46fc081](https://github.com/davidglezz/sid-worklet/commit/46fc081b40b88059e23c753df64862227b43a77e))
+* **audio-visualizer:** avoid parsing the CSS color for frequency bars ([ae4fcd8](https://github.com/davidglezz/sid-worklet/commit/ae4fcd8f03fb2f19d3765384cd08f8e9f7ccda3e))
+* **audio-visualizer:** validate the 2D context before using it ([3637598](https://github.com/davidglezz/sid-worklet/commit/3637598cfdc1958f41073bd7b66553faa386fb34))
+* **ci:** install sid2wasm dependencies through the pnpm workspace ([559595c](https://github.com/davidglezz/sid-worklet/commit/559595c71ab7c7beb163581e8609e473d14af1a5))
+* **sid2wasm:** satisfy no-floating-promises in compare test ([3c1e925](https://github.com/davidglezz/sid-worklet/commit/3c1e925cb497d96a92d340d81bb651fe920d235b))
+* **sid:** parse the 16-bit data offset and honor the header load address ([9d513a6](https://github.com/davidglezz/sid-worklet/commit/9d513a6a9dca357f6e21cc58056ea62a41b1bb93))
+* **sid:** parse the 16-bit song count and preferred start song ([49f24d8](https://github.com/davidglezz/sid-worklet/commit/49f24d820102547ca423c5679136304302f6377f))
+* **ui:** cancel the previous song-list render before parsing ([0bb554f](https://github.com/davidglezz/sid-worklet/commit/0bb554f32273b9989fdb7d87d4c473412b992cb1))
+* **ui:** drop the subsongs label and pad every list duration ([3d0eb3a](https://github.com/davidglezz/sid-worklet/commit/3d0eb3a27142b989845de1fb44efa9fe20f9e487))
+* **ui:** handle async loading and playback errors ([03adc5f](https://github.com/davidglezz/sid-worklet/commit/03adc5fe9130f80a7577a347a0c0cf2bbf49c395))
+* **ui:** keep sticky author headers above song rows ([aefea26](https://github.com/davidglezz/sid-worklet/commit/aefea269bcebf12b566983b4fcc1cdf0e1e4fbac))
+* **ui:** place the random button above the volume and start playback ([fefc9b9](https://github.com/davidglezz/sid-worklet/commit/fefc9b9a47ae92916f8b6e3e83d50ef18bc32895))
+* **ui:** restore content-visibility for song list sections ([18c18ee](https://github.com/davidglezz/sid-worklet/commit/18c18ee4a143d24448c23bf97c4f524bf396f4f7))
+* **ui:** show subsong count and unpadded total duration in the song list ([eb8f6dc](https://github.com/davidglezz/sid-worklet/commit/eb8f6dc83c9e3ffe2ce15b94687b3b3ad3f987b6))
+* **worklet:** harden message dispatch and output channels ([97b0e5c](https://github.com/davidglezz/sid-worklet/commit/97b0e5c1133191a289ea7be6cbe25f44b2041548))
+* **worklet:** surface SID load errors to the player ([65cfbff](https://github.com/davidglezz/sid-worklet/commit/65cfbff8799c1e02f05861700d3a10c49afd12ab))
+
+
+### Performance Improvements
+
+* **cpu:** cache addressing results and drop unused IR ([1ffdc01](https://github.com/davidglezz/sid-worklet/commit/1ffdc012102afbefab4590a6ddb63d9b4276661d))
+* **seek:** run seek fast-forward in a worker ([dc5d8f1](https://github.com/davidglezz/sid-worklet/commit/dc5d8f1cbc832cb6cc42d9b7d688931ae2962b53))
+* **sid:** add batch render API for the audio worklet ([37747d5](https://github.com/davidglezz/sid-worklet/commit/37747d5d4ab6680e2e42c413b95dcda8d88b7f31))
+* **sid:** cache filter cutoff and resonance coefficients ([ca5fcfa](https://github.com/davidglezz/sid-worklet/commit/ca5fcfa18c398f7f7a85d81c0c8cdced8962ddeb))
+* **sid:** hoist per-sample and per-tick constants ([7f8e56f](https://github.com/davidglezz/sid-worklet/commit/7f8e56f7ce0ede3845782bb6978a23aea15ec45c))
+* **sid:** keep filter/output accumulators in locals ([b511e69](https://github.com/davidglezz/sid-worklet/commit/b511e69a578f9e9dd0eb7a4d8e75f340abbb0f87))
+* **sid:** reuse preallocated checkpoint buffers ([bb5da93](https://github.com/davidglezz/sid-worklet/commit/bb5da936beb0bde176b654bd72cc0f655b9ef806))
+* **sid:** store page-delta checkpoints every 5 seconds ([200df8f](https://github.com/davidglezz/sid-worklet/commit/200df8fbfa139ef2f6929445f15c8fee4239d040))
+* **sid:** use typed waveform tables and bit-shift filter routing ([af8cebe](https://github.com/davidglezz/sid-worklet/commit/af8cebe7fd5cb80add6e09dc037cef0055baad43))
+* **ui:** render the 60k-entry song list in asynchronous batches ([5e3bd6a](https://github.com/davidglezz/sid-worklet/commit/5e3bd6a935527be96ef62e96e6f9476f74777a78))
+
 ## 1.0.0 (2026-05-17)
 
 ### Features
